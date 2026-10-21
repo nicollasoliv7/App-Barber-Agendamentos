@@ -78,20 +78,20 @@ export default function Historico({ slug, pagamento }: { slug: string; pagamento
           Sair
         </button>
       </div>
-      {msg && <p className="cartao rounded-lg p-3 text-sm">{msg}</p>}
+      {msg && <p className="card rounded-lg p-3 text-sm">{msg}</p>}
       {dados?.agendamentos.length === 0 && <p className="suave">Você ainda não tem agendamentos.</p>}
       {dados?.agendamentos.map((a) => {
         const aberto = a.status === "confirmado" || a.status === "pendente_pagamento";
         const futuro = new Date(a.inicio).getTime() > agora;
         const podePagar = aberto && futuro && pagamento.modo !== "desativado" && a.pago_centavos === 0;
         return (
-          <article key={a.id} className="cartao rounded-xl p-4" style={{ opacity: aberto && futuro ? 1 : 0.7 }}>
+          <article key={a.id} className="card rounded-xl p-4" style={{ opacity: aberto && futuro ? 1 : 0.7 }}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{a.servico}</div>
                 <div className="text-sm suave">com {a.profissional}</div>
               </div>
-              <span className="text-xs rounded-full px-2 py-1 cartao whitespace-nowrap">{ROTULO[a.status] ?? a.status}</span>
+              <span className="badge badge-sem-ponto">{ROTULO[a.status] ?? a.status}</span>
             </div>
             <div className="mt-2 text-sm first-letter:uppercase">{formatarDataHora(a.inicio)}</div>
             <div className="text-sm">
@@ -101,17 +101,17 @@ export default function Historico({ slug, pagamento }: { slug: string; pagamento
             {(podePagar || a.pode_remarcar || a.pode_cancelar) && (
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 {podePagar && (
-                  <button className="btn rounded-lg px-3 py-1.5" onClick={() => setAcao({ tipo: "pagar", ag: a })}>
+                  <button className="btn btn-quente btn-sm" onClick={() => setAcao({ tipo: "pagar", ag: a })}>
                     Pagar
                   </button>
                 )}
                 {a.pode_remarcar && (
-                  <button className="cartao rounded-lg px-3 py-1.5" onClick={() => setAcao({ tipo: "remarcar", ag: a })}>
+                  <button className="btn btn-sutil btn-sm" onClick={() => setAcao({ tipo: "remarcar", ag: a })}>
                     Remarcar
                   </button>
                 )}
                 {a.pode_cancelar && (
-                  <button className="cartao rounded-lg px-3 py-1.5" onClick={() => setAcao({ tipo: "cancelar", ag: a })}>
+                  <button className="btn btn-sutil btn-sm" onClick={() => setAcao({ tipo: "cancelar", ag: a })}>
                     Cancelar
                   </button>
                 )}
@@ -121,7 +121,7 @@ export default function Historico({ slug, pagamento }: { slug: string; pagamento
         );
       })}
       {dados?.temMais && (
-        <button className="cartao rounded-lg py-2 text-sm" onClick={() => carregar(pagina + 1)}>
+        <button className="btn btn-sutil w-full" onClick={() => carregar(pagina + 1)}>
           Ver mais
         </button>
       )}
@@ -184,10 +184,10 @@ function Cancelar({ ag, onFeito }: { ag: Ag; onFeito: () => void }) {
         Cancelar <strong>{ag.servico}</strong> em <span className="first-letter:uppercase">{formatarDataHora(ag.inicio)}</span>?
       </p>
       {ag.pago_centavos > 0 && <p className="text-sm suave">O valor pago será tratado diretamente com a barbearia.</p>}
-      {erro && <p className="text-sm text-red-400">{erro}</p>}
+      {erro && <p className="text-sm text-[#ff9aa2]">{erro}</p>}
       <button
         disabled={ocupado}
-        className="btn rounded-lg py-3 font-semibold"
+        className="btn btn-quente w-full !py-3"
         onClick={async () => {
           setOcupado(true);
           try {
@@ -225,7 +225,7 @@ function Remarcar({ ag, onFeito }: { ag: Ag; onFeito: () => void }) {
 
   return (
     <div className="grid gap-4">
-      <div className="cartao rounded-lg p-3 text-sm">
+      <div className="card rounded-lg p-3 text-sm">
         Horário atual: <span className="first-letter:uppercase">{formatarDataHora(ag.inicio)}</span>
       </div>
       {!dias ? (
@@ -253,7 +253,7 @@ function Remarcar({ ag, onFeito }: { ag: Ag; onFeito: () => void }) {
                   setDia(d);
                   setHoras(null);
                   setHora(null);
-                }} className="chip cartao rounded-lg px-3 py-2 text-sm first-letter:uppercase">
+                }} className="chip text-sm first-letter:uppercase">
                 {formatarDia(d)}
               </button>
             ))}
@@ -268,17 +268,17 @@ function Remarcar({ ag, onFeito }: { ag: Ag; onFeito: () => void }) {
             <p className="suave text-sm col-span-4">Sem horários neste dia.</p>
           ) : (
             horas.map((h) => (
-              <button key={h} data-ativo={hora === h} onClick={() => setHora(h)} className="chip cartao rounded-lg py-2 text-sm">
+              <button key={h} data-ativo={hora === h} onClick={() => setHora(h)} className="chip mono text-sm">
                 {h}
               </button>
             ))
           )}
         </div>
       )}
-      {erro && <p className="text-sm text-red-400">{erro}</p>}
+      {erro && <p className="text-sm text-[#ff9aa2]">{erro}</p>}
       <button
         disabled={!dia || !hora}
-        className="btn rounded-lg py-3 font-semibold"
+        className="btn btn-quente w-full !py-3"
         onClick={async () => {
           try {
             await api(`/api/cliente/agendamentos/${ag.id}/remarcar`, { json: { dia, hora } });
@@ -345,7 +345,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
   }
 
   return (
-    <section className="mt-8 cartao rounded-2xl p-5">
+    <section className="card p-5">
       <h2 className="text-lg font-semibold">Seus agendamentos</h2>
       <p className="text-sm suave mb-4">Entre com o telefone que você usou para agendar.</p>
 
@@ -374,7 +374,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
             onChange={(e) => setTelefone(mascaraTelefone(e.target.value))}
             className="rounded-lg px-3 py-2"
           />
-          <button disabled={ocupado} className="btn rounded-lg py-3 font-semibold">
+          <button disabled={ocupado} className="btn btn-quente w-full !py-3">
             Continuar
           </button>
         </form>
@@ -396,7 +396,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={ver} onChange={(e) => setVer(e.target.checked)} /> Mostrar senha
           </label>
-          <button disabled={ocupado} className="btn rounded-lg py-3 font-semibold">
+          <button disabled={ocupado} className="btn btn-quente w-full !py-3">
             Entrar
           </button>
           <button type="button" className="text-sm underline suave" onClick={() => rodar(pedirCodigo)}>
@@ -439,7 +439,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={ver} onChange={(e) => setVer(e.target.checked)} /> Mostrar senha
           </label>
-          <button disabled={ocupado} className="btn rounded-lg py-3 font-semibold">
+          <button disabled={ocupado} className="btn btn-quente w-full !py-3">
             Confirmar
           </button>
           <button type="button" disabled={reenvio > 0} className="text-sm underline suave disabled:no-underline" onClick={() => rodar(pedirCodigo)}>
@@ -448,7 +448,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
         </form>
       )}
 
-      {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+      {erro && <p className="mt-3 text-sm text-[#ff9aa2]">{erro}</p>}
       {etapa !== "telefone" && (
         <button
           className="mt-3 text-sm suave"

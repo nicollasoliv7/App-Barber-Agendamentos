@@ -53,7 +53,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
   return (
     <div className="grid gap-6">
       <header className="flex flex-wrap items-end gap-3">
-        <h1 className="text-2xl font-bold mr-auto">Financeiro e relatórios</h1>
+        <h1 className="text-2xl font-semibold tracking-tight mr-auto">Financeiro e relatórios</h1>
         <form className="flex flex-wrap items-end gap-2 text-sm">
           <label className="grid">
             De <input type="date" name="de" defaultValue={de} className={inp} />
@@ -61,7 +61,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
           <label className="grid">
             Até <input type="date" name="ate" defaultValue={ate} className={inp} />
           </label>
-          <button className="rounded-lg bg-white px-3 py-2 shadow-sm">Filtrar</button>
+          <button className="btn btn-sutil">Filtrar</button>
         </form>
       </header>
 
@@ -80,7 +80,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
               <td>{c.atendimentos}</td>
               <td>{reais(c.bruto)}</td>
               <td className="font-semibold">
-                {reais(Math.round((c.bruto * c.pct) / 100))} <span className="text-slate-400 font-normal">({c.pct}%)</span>
+                {reais(Math.round((c.bruto * c.pct) / 100))} <span className="faint font-normal">({c.pct}%)</span>
               </td>
             </tr>
           ))}
@@ -88,7 +88,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
         <Tabela titulo="Recebimentos por forma de pagamento" cab={["Forma", "Qtd.", "Valor"]}>
           {porMetodo.length === 0 && (
             <tr>
-              <td colSpan={3} className="text-slate-400">
+              <td colSpan={3} className="faint">
                 Nenhum pagamento no período.
               </td>
             </tr>
@@ -117,21 +117,21 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
 
 function Kpi({ r, v, d }: { r: string; v: string; d: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="text-xs text-slate-500">{r}</div>
+    <div className="card p-4 md:p-5">
+      <div className="text-xs muted">{r}</div>
       <div className="text-xl font-bold">{v}</div>
-      <div className="text-xs text-slate-400">{d}</div>
+      <div className="text-xs faint">{d}</div>
     </div>
   );
 }
 
 function Tabela({ titulo, cab, children }: { titulo: string; cab: string[]; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm overflow-x-auto">
-      <h2 className="mb-3 font-semibold">{titulo}</h2>
-      <table className="w-full text-sm [&_td]:py-1.5 [&_td]:pr-3 [&_th]:pr-3 [&_tr]:border-b">
+    <section className="card p-4 md:p-5 overflow-x-auto">
+      <h2 className="mb-3 font-medium">{titulo}</h2>
+      <table className="tabela">
         <thead>
-          <tr className="text-left text-slate-500">
+          <tr className="text-left muted">
             {cab.map((c) => (
               <th key={c} className="font-normal pb-2">
                 {c}

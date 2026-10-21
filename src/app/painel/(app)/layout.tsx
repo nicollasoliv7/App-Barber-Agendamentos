@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioPainel } from "@/lib/sessao";
+import { Aurora, Icone, Logo } from "@/components/ui";
 import { sair } from "../acoes";
 import Menu from "./Menu";
 
@@ -8,35 +9,51 @@ export default async function PainelLayout({ children }: { children: React.React
   const u = await usuarioPainel();
   if (!u) redirect("/painel/login");
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 md:flex">
-      <aside className="bg-slate-900 text-slate-100 md:w-60 md:min-h-screen md:sticky md:top-0 p-4 flex flex-col gap-3 md:gap-4">
-        <div className="flex items-center justify-between gap-3 md:block">
-          <div className="min-w-0">
-            <div className="text-lg font-bold">Agendou</div>
-            <div className="text-xs text-slate-400 truncate">{u.empresa_nome}</div>
+    <div className="ui relative min-h-screen md:flex">
+      <div className="fixed inset-0 -z-10">
+        <Aurora suave />
+      </div>
+      <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 btn btn-key">
+        Pular para o conteúdo
+      </a>
+      <aside className="glass md:w-64 md:h-screen md:sticky md:top-0 md:rounded-none md:border-y-0 md:border-l-0 p-3 md:p-4 flex flex-col gap-3 md:gap-5 z-20">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 px-1">
+            <Logo className="text-[15px]" />
+            <div className="mt-0.5 truncate text-xs muted">{u.empresa_nome}</div>
           </div>
-          {/* atalhos no celular */}
-          <div className="flex items-center gap-3 text-sm md:hidden">
-            <Link href={`/${u.empresa_slug}`} target="_blank" className="text-teal-300">
-              Página ↗
+          <div className="flex items-center gap-2 md:hidden">
+            <Link href={`/${u.empresa_slug}`} target="_blank" className="btn btn-sutil btn-sm" aria-label="Abrir página pública">
+              <Icone nome="link" tamanho={14} /> Página
             </Link>
             <form action={sair}>
-              <button className="text-slate-300">Sair</button>
+              <button className="btn btn-sutil btn-sm" aria-label="Sair">
+                <Icone nome="sair" tamanho={14} />
+              </button>
             </form>
           </div>
         </div>
         <Menu />
-        <div className="hidden md:grid gap-2 mt-auto text-sm">
-          <Link href={`/${u.empresa_slug}`} target="_blank" className="text-teal-300 hover:underline">
-            Abrir página pública ↗
+        <div className="hidden md:grid gap-3 mt-auto">
+          <Link href={`/${u.empresa_slug}`} target="_blank" className="card card-hover p-3 text-sm">
+            <span className="flex items-center gap-2 font-medium">
+              <Icone nome="link" tamanho={14} /> Página de agendamento
+            </span>
+            <span className="mono mt-1 block truncate text-[11px] muted">/{u.empresa_slug}</span>
           </Link>
-          <div className="text-slate-400 truncate">{u.nome}</div>
-          <form action={sair}>
-            <button className="text-slate-400 hover:text-white">Sair</button>
-          </form>
+          <div className="flex items-center justify-between gap-2 px-1 text-sm">
+            <span className="truncate muted">{u.nome}</span>
+            <form action={sair}>
+              <button className="btn btn-sutil btn-sm" title="Sair">
+                <Icone nome="sair" tamanho={14} /> Sair
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
-      <main className="flex-1 p-4 md:p-8 min-w-0">{children}</main>
+      <main id="conteudo" className="relative flex-1 min-w-0 px-4 py-6 md:px-8 md:py-8">
+        <div className="mx-auto max-w-[1240px]">{children}</div>
+      </main>
     </div>
   );
 }

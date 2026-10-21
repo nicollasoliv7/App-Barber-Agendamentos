@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioPainel } from "@/lib/sessao";
+import { Aurora, Logo } from "@/components/ui";
 import LoginForm from "./LoginForm";
 
 export const metadata = { title: "Entrar no painel" };
@@ -7,14 +9,18 @@ export const metadata = { title: "Entrar no painel" };
 export default async function Page() {
   if (await usuarioPainel()) redirect("/painel");
   return (
-    <main className="min-h-screen grid place-items-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow">
-        <h1 className="text-2xl font-bold">Agendou</h1>
-        <p className="mb-6 text-sm text-slate-500">Painel da empresa</p>
+    <main className="ui relative grid min-h-screen place-items-center overflow-hidden px-4">
+      <Aurora />
+      <div className="glass relative w-full max-w-sm rounded-2xl p-7 surgir">
+        <Link href="/" className="inline-block">
+          <Logo className="text-lg" />
+        </Link>
+        <h1 className="mt-6 text-xl font-semibold">Entrar no painel</h1>
+        <p className="mb-6 text-sm muted">Agenda, clientes e faturamento da sua barbearia.</p>
         <LoginForm />
         {process.env.NODE_ENV !== "production" && (
-          <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-            Ambiente de desenvolvimento — acesso de exemplo: <b>dono@agendou.dev</b> / <b>agendou123</b>
+          <p className="mt-5 rounded-lg border border-[#ffb347]/30 bg-[#ffb347]/[0.07] p-3 text-xs text-[#ffcf8a]">
+            Ambiente de desenvolvimento — acesso de exemplo: <b className="mono">dono@agendou.dev</b> / <b className="mono">agendou123</b>
           </p>
         )}
       </div>

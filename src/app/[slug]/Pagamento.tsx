@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatorio, logado, onPago, onCancelado }: Props) {
-  const [metodo, setMetodo] = useState<"pix" | "cartao">("pix");
+  const [metodo, setMetodo] = useState<"pix" | "card">("pix");
   const [tipo, setTipo] = useState<"minimo" | "integral">(cfg.tipo === "minimo" ? "minimo" : "integral");
   const [pix, setPix] = useState<Pix | null>(null);
   const [restante, setRestante] = useState(0);
@@ -77,7 +77,7 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
   }, [pix, qs, obrigatorio, onPago, onCancelado]);
 
   useEffect(() => {
-    if (metodo === "cartao" && logado && cartoes === null)
+    if (metodo === "card" && logado && cartoes === null)
       api<{ cartoes: Cartao[] }>(`/api/cliente/cartoes`).then((r) => setCartoes(r.cartoes)).catch(() => setCartoes([]));
   }, [metodo, logado, cartoes]);
 
@@ -118,15 +118,15 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs">
+      <div className="rounded-lg border border-[#ffb347]/30 bg-[#ffb347]/[0.07] px-3 py-2 text-xs text-[#ffcf8a]">
         Ambiente de teste (sandbox): nenhum valor real é cobrado.
       </div>
 
       {!pix && (
         <>
           <div className="flex gap-2">
-            {(["pix", "cartao"] as const).map((m) => (
-              <button key={m} onClick={() => setMetodo(m)} data-ativo={metodo === m} className="chip cartao flex-1 rounded-lg py-2 font-medium">
+            {(["pix", "card"] as const).map((m) => (
+              <button key={m} onClick={() => setMetodo(m)} data-ativo={metodo === m} className="chip flex-1 font-medium">
                 {m === "pix" ? "Pix" : "Cartão"}
               </button>
             ))}
@@ -134,11 +134,11 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
 
           {cfg.tipo === "cliente_escolhe" && (
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setTipo("minimo")} data-ativo={tipo === "minimo"} className="chip cartao rounded-lg p-3 text-left">
+              <button onClick={() => setTipo("minimo")} data-ativo={tipo === "minimo"} className="chip !flex-col !items-start !p-3 text-left">
                 <div className="text-xs suave">Sinal ({cfg.minimo_pct}%)</div>
                 <div className="font-semibold">{reais(minimo)}</div>
               </button>
-              <button onClick={() => setTipo("integral")} data-ativo={tipo === "integral"} className="chip cartao rounded-lg p-3 text-left">
+              <button onClick={() => setTipo("integral")} data-ativo={tipo === "integral"} className="chip !flex-col !items-start !p-3 text-left">
                 <div className="text-xs suave">Valor integral</div>
                 <div className="font-semibold">{reais(preco)}</div>
               </button>
@@ -152,7 +152,7 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
           )}
 
           {metodo === "pix" ? (
-            <button disabled={ocupado} onClick={gerarPix} className="btn rounded-lg py-3 font-semibold">
+            <button disabled={ocupado} onClick={gerarPix} className="btn btn-quente w-full !py-3">
               {ocupado ? "Gerando…" : `Gerar código Pix de ${reais(valor)}`}
             </button>
           ) : !logado ? (
@@ -175,7 +175,7 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
           <div className="flex gap-2">
             <input readOnly value={pix.pix_copia_cola} className="min-w-0 flex-1 rounded-lg px-2 py-2 text-xs" aria-label="Pix copia e cola" />
             <button
-              className="cartao rounded-lg px-3 text-sm"
+              className="btn btn-sutil"
               onClick={() => {
                 navigator.clipboard?.writeText(pix.pix_copia_cola).then(() => {
                   setCopiado(true);
@@ -190,7 +190,7 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
             Tempo restante: {mm}:{ss}
           </p>
           <p className="text-xs suave">Aguardando confirmação do pagamento…</p>
-          <button disabled={ocupado} onClick={simular} className="btn rounded-lg py-3 font-semibold">
+          <button disabled={ocupado} onClick={simular} className="btn btn-quente w-full !py-3">
             Simular pagamento aprovado (teste)
           </button>
           <button onClick={cancelar} className="text-sm underline suave">
@@ -199,7 +199,7 @@ export default function Pagamento({ agendamentoId, token, preco, cfg, obrigatori
         </div>
       )}
 
-      {erro && <p className="text-sm text-red-400 text-center">{erro}</p>}
+      {erro && <p className="text-sm text-[#ff9aa2] text-center">{erro}</p>}
     </div>
   );
 }
@@ -237,17 +237,17 @@ function Cartoes({
   return (
     <div className="grid gap-2">
       {cartoes.map((c) => (
-        <div key={c.id} className="cartao flex items-center justify-between rounded-lg p-3 text-sm">
+        <div key={c.id} className="card flex items-center justify-between rounded-lg p-3 text-sm">
           <span className="first-letter:uppercase">
             {c.bandeira} •••• {c.ultimos4} {c.favorito && "★"}
           </span>
-          <button disabled={ocupado} onClick={() => onPagar(c.id)} className="btn rounded-md px-3 py-1">
+          <button disabled={ocupado} onClick={() => onPagar(c.id)} className="btn btn-quente btn-sm">
             Pagar
           </button>
         </div>
       ))}
       {!novo ? (
-        <button onClick={() => setNovo(true)} className="cartao rounded-lg py-2 text-sm">
+        <button onClick={() => setNovo(true)} className="btn btn-sutil w-full">
           + Cadastrar cartão
         </button>
       ) : (
@@ -281,8 +281,8 @@ function Cartoes({
             />
           </div>
           <p className="text-xs suave">Teste: 4111 1111 1111 1111 (aprova) · 4000 0000 0000 0002 (recusa)</p>
-          {erro && <p className="text-red-400">{erro}</p>}
-          <button className="btn rounded-lg py-2">Salvar cartão</button>
+          {erro && <p className="text-[#ff9aa2]">{erro}</p>}
+          <button className="btn btn-quente w-full">Salvar cartão</button>
         </form>
       )}
     </div>

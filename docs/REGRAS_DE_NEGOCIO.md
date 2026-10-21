@@ -51,3 +51,24 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
 - **R32** — Senhas são guardadas com hash (scrypt), e as sessões em cookie httpOnly com validade de 30 dias.
 - **R33** — Os dados de exemplo são fictícios. Nenhum dado real da referência é usado.
 - **R34 · Pixel (LGPD)** — O pixel de campanha configurado pela empresa só é carregado depois que o visitante vê e aceita o aviso de privacidade.
+
+## 7. Agendamento público sem login (v3)
+- **R35 · Sem preferência** — Quando o serviço tem mais de um profissional, o cliente pode escolher "Sem preferência". Os dias e horários mostrados são a união dos horários livres dos profissionais elegíveis (R7/R7b). Ao confirmar, o sistema checa de novo, dentro da transação, quem está livre naquele horário e escolhe quem tem **menos atendimentos no dia**. Se ninguém estiver livre, responde 409 (R10).
+- **R36 · Gerenciar pelo link** — Cada agendamento tem um token secreto (`token_publico`, 32 caracteres). O link `/{slug}/agendamento/{id}?t={token}` permite ver, remarcar e cancelar **sem login**, com as mesmas regras de prazo (R22/R23). O token só vale para aquele agendamento e só dentro da empresa do slug. Token errado devolve 404, sem revelar se o agendamento existe.
+- **R37 · Comprovante** — Após confirmar, o cliente pode baixar um `.ics` (com lembrete 2 h antes) ou abrir o Google Agenda. A mensagem "Enviamos a confirmação no WhatsApp" só aparece quando há provedor de WhatsApp configurado.
+- **R38 · Dados no aparelho** — Nome e telefone podem ser lembrados **no próprio aparelho** (localStorage) para o próximo agendamento. Nada é enviado ao servidor antes de confirmar.
+
+## 8. Importação de clientes (v3)
+- **R39 · Etapas** — enviar arquivo → mapear colunas → revisar → confirmar. Nada é gravado em `cliente` antes da confirmação. O arquivo fica num rascunho (`importacao.linhas`) e **os dados brutos são apagados** ao concluir ou cancelar; fica só o resumo.
+- **R40 · Formatos** — CSV (separador `;` `,` `|` ou tab, detectado sozinho; UTF-8 ou Windows-1252) e Excel `.xlsx`. Limite: 5 MB e 10.000 linhas. `.xls` antigo é recusado com orientação.
+- **R41 · Campos** — Nome e telefone são obrigatórios. E-mail, nascimento, CPF e observações são opcionais: um valor inválido em campo opcional é **descartado com aviso**, e o cliente entra assim mesmo. Uma linha sem nome ou sem telefone válido é **rejeitada**. Se o telefone vier sem DDD, aplica-se o "DDD padrão" informado.
+- **R42 · Duplicados** — O telefone identifica o cliente. No mesmo arquivo, só a 1ª ocorrência entra. Para quem já existe no banco, a política padrão é **manter como está**. A opção "completar" só preenche e-mail, observações, nascimento e CPF **que estiverem vazios**: nome e dados existentes nunca são sobrescritos.
+- **R43 · Permissão** — Só os papéis `dono` e `admin` importam. Tudo roda no servidor com `empresa_id` da sessão. No Supabase, a RLS deixa o gestor ver o histórico de importações, mas nunca os dados brutos.
+- **R44 · O que não é importado** — histórico de atendimentos, pagamentos, pacotes e assinaturas, senhas, cartões e fotos. A tela informa isso antes do envio.
+- **R45 · Integrações por API** — A estrutura (`src/lib/importacao/fontes.ts`) aceita conectores futuros que devolvem o mesmo formato de planilha. Nenhum está implementado, e a tela diz isso.
+
+## 9. CRM e relatórios (v3)
+- **R46 · Filtros** — período (hoje, 7 dias, 30 dias, este mês, mês passado, personalizado), serviço, profissional, status e cliente (nome/telefone). Os filtros ficam na URL, então dá para compartilhar ou salvar a visão.
+- **R47 · Indicadores** — faturamento realizado (concluídos), receita prevista (confirmados + concluídos), agendamentos (sem cancelados), ticket médio (realizado ÷ concluídos), clientes novos e taxa de cancelamentos + faltas. A variação é comparada com o período anterior de mesmo tamanho; sem base de comparação, não se mostra porcentagem.
+- **R48 · Segmentos de clientes** — com horário marcado, sem visita há 45+ dias (sem horário futuro), novos (30 dias) e importados.
+- **R49 · Exportação** — o CSV de agendamentos respeita os filtros e é protegido contra *CSV injection*: células que começam com `= + - @` ganham apóstrofo na frente.

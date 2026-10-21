@@ -29,6 +29,8 @@ erDiagram
   USUARIO_PAINEL ||--o{ SESSAO : "acessa via"
   AGENDAMENTO ||--o{ NOTIFICACAO : gera
   CLIENTE ||--o{ CODIGO_VERIFICACAO : recebe
+  EMPRESA ||--o{ IMPORTACAO : registra
+  IMPORTACAO ||--o{ CLIENTE : "trouxe"
 ```
 
 ## Entidades
@@ -129,3 +131,9 @@ id, empresa_id, telefone, codigo_hash, expira_em, tentativas, usado.
 
 ### notificacao
 id, empresa_id, agendamento_id null, canal (`whatsapp` \| `sms` \| `email`), destino, mensagem, status (`pendente` \| `enviado` \| `falhou`), criado_em, enviado_em.
+
+### importacao (v3)
+id, empresa_id, usuario_id, fonte (`arquivo`; futuramente o id do conector de API), formato (`csv` | `xlsx` | `api`), arquivo_nome, status (`rascunho` | `concluida` | `cancelada`), total_linhas, colunas jsonb, **linhas jsonb (só enquanto rascunho)**, mapeamento jsonb, politica_duplicados (`manter` | `completar`), resultado jsonb (contagens + erros por número de linha), criado_em, concluido_em.
+
+### cliente: colunas novas (v3)
+`observacoes` (anotações da equipe), `origem` (`agendamento` | `painel` | `importacao`), `importacao_id`.

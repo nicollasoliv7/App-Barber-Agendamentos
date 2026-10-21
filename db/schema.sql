@@ -25,10 +25,10 @@ create table if not exists unidade (
 
 create table if not exists config_tema (
   empresa_id uuid primary key references empresa(id) on delete cascade,
-  cor_primaria text not null default '#0f766e',
+  cor_primaria text not null default '#ff5a3c',
   cor_secundaria text not null default '#f59e0b',
-  cor_fundo text not null default '#0b1215',
-  cor_texto text not null default '#f1f5f9',
+  cor_fundo text not null default '#07080a',
+  cor_texto text not null default '#f5f5f5',
   modo text not null default 'escuro' check (modo in ('claro','escuro'))
 );
 
@@ -39,7 +39,7 @@ create table if not exists config_agendamento (
   janela_max_dias int not null default 30 check (janela_max_dias between 1 and 365),
   cancelamento_ate_min int not null default 120 check (cancelamento_ate_min >= 0),
   remarcacao_ate_min int not null default 120 check (remarcacao_ate_min >= 0),
-  pagamento_modo text not null default 'opcional' check (pagamento_modo in ('desativado','opcional','obrigatorio')),
+  pagamento_modo text not null default 'desativado' check (pagamento_modo in ('desativado','opcional','obrigatorio')),
   pagamento_tipo text not null default 'cliente_escolhe' check (pagamento_tipo in ('minimo','integral','cliente_escolhe')),
   pagamento_minimo_pct int not null default 30 check (pagamento_minimo_pct between 1 and 100),
   pix_expiracao_min int not null default 5 check (pix_expiracao_min between 1 and 60),
@@ -215,3 +215,27 @@ create table if not exists notificacao (
 
 -- v2: lembretes automáticos
 alter table agendamento add column if not exists lembrete_enviado_em timestamptz;
+
+-- v3: CRM e importação de clientes
+create table if not exists importacao (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  usuario_id uuid references usuario_painel(id) on delete set null,
+  fonte text not null default 'arquivo',
+  formato text not null check (formato in ('csv','xlsx','api')),
+  arquivo_nome text,
+  status text not null default 'rascunho' check (status in ('rascunho','concluida','cancelada')),
+  total_linhas int not null default 0,
+  colunas jsonb not null default '[]'::jsonb,
+  linhas jsonb,
+  mapeamento jsonb,
+  politica_duplicados text,
+  resultado jsonb,
+  criado_em timestamptz not null default now(),
+  concluido_em timestamptz
+);
+create index if not exists importacao_empresa on importacao (empresa_id, criado_em desc);
+alter table cliente add column if not exists observacoes text;
+alter table cliente add column if not exists origem text not null default 'agendamento';
+alter table cliente add column if not exists importacao_id uuid references importacao(id) on delete set null;
+create index if not exists cliente_empresa_nome on cliente (empresa_id, nome);

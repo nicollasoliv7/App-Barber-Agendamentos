@@ -60,16 +60,31 @@ agendou/
 └─ .data/pglite/            # banco local (criado sozinho; fora do git)
 ```
 
+## 2.1 Sistema visual (v3)
+Fundo quase preto `#07080a` com uma **aurora quente** animada (carmim `#ff2f3a` → coral `#ff6b4a` → âmbar `#ffb347`), feita só com CSS (keyframes, grão SVG e vinheta). A animação é desligada com `prefers-reduced-motion`. Todo o resto é neutro (`#fff` / `#9c9c9d`). Fontes: Inter na interface e Geist Mono só em horários, atalhos e códigos, ambas self-hosted via `@fontsource`.
+
+Componentes em `src/app/globals.css` + `src/components/ui.tsx`:
+- `.glass` (painel de vidro), `.card`, `.btn-key` (tecla clara em relevo, ação principal), `.btn-quente` (confirmar/agendar), `.btn-ghost` (pílula), `.btn-sutil`;
+- `.chip` (seleção), `.badge-*` (status com ponto, nunca só cor), `.kbd`, `.tabela`, `.esqueleto` (carregamento);
+- `Aurora`, `Logo`, `Icone`, `StatusBadge`, `Kpi`, `Vazio`.
+
+A página pública usa a mesma base, mas a cor de ação e a aurora vêm do **tema da empresa** (`--t-primaria`). Gráficos usam uma única cor validada para o fundo escuro (`#e85a3a`), com tooltip, foco por teclado e alternância para tabela.
+
 ## 3. Rotas de tela
 
 | Rota | Quem usa | Tela do mapa |
 |---|---|---|
 | `/` | todos | — |
 | `/{slug}` | cliente final | A1–A4 |
-| `/{slug}` → aba Histórico | cliente final | A3, A5 |
+| `/{slug}` → aba "Meus agendamentos" | cliente final | A3, A5 |
+| `/{slug}/agendamento/{id}?t=` | cliente final, **sem login** | ver, remarcar, cancelar, `.ics` (R36) |
 | `/painel/login` | dono | B1 |
-| `/painel` | dono | B2 Agenda |
-| `/painel/clientes` | dono | B3 |
+| `/painel` | dono | **Visão geral**: KPIs com comparação, receita por dia, serviços mais procurados, melhores clientes, próximos horários, link público com QR |
+| `/painel/agenda` | dono | B2 Agenda do dia + agendamento manual |
+| `/painel/agendamentos` | dono | histórico completo com filtros, paginação e exportação CSV |
+| `/painel/clientes/[id]` | dono | ficha do cliente: indicadores, histórico, preferências, observações |
+| `/painel/clientes/importar` | dono/admin | importação CSV/Excel em 4 etapas + histórico de importações |
+| `/painel/clientes` | dono | B3 CRM: busca, segmentos, ordenação, cadastro manual |
 | `/painel/servicos` | dono | B4 |
 | `/painel/profissionais` | dono | B5 (+ comissão) |
 | `/painel/horarios` | dono | B6 |
@@ -85,6 +100,11 @@ agendou/
 |---|---|---|
 | GET | `/` | empresa, tema, regras de pagamento, serviços, campos |
 | GET | `/profissionais?servico=[&unidade=]` | R7, R7b |
+| GET | `/dias`, `/horarios` com `profissional=qualquer` | "sem preferência" (R35) |
+| GET | `/agendamentos/{id}?t=` | detalhes pelo link (R36) |
+| GET | `/agendamentos/{id}/horarios?t=[&dia=]` | dias/horas para remarcar pelo link |
+| POST | `/agendamentos/{id}/remarcar`, `/agendamentos/{id}/cancelar` | com `{ t }` no corpo |
+| GET | `/agendamentos/{id}/ics?t=` | arquivo de calendário (R37) |
 | GET | `/dias?servico=&profissional=` | R5, R6 |
 | GET | `/horarios?servico=&profissional=&dia=` | R1–R4 |
 | POST | `/agendamentos` | cria (R9–R14) e devolve o `token` do agendamento |
@@ -112,10 +132,13 @@ agendou/
 
 **Sistema**: `POST /api/cron/expirar` (R18) e `POST /api/cron/lembretes` (R14b), ambos protegidos por `CRON_SECRET` quando ele está definido. Localmente, `src/instrumentation.ts` executa as duas rotinas a cada minuto (para desligar, `ROTINAS_INTERNAS=0`).
 
-**Painel**: server actions em `src/app/painel/acoes.ts`: entrar/sair, novoAgendamentoManual, mudarStatus, registrarPagamentoLocal, salvarServico, salvarProfissional, adicionarFaixa/removerFaixa, adicionarBloqueio/removerBloqueio, salvarEmpresa, salvarTema, salvarRegras, salvarCampo, salvarCliente, salvarUnidade, estornarPagamentos.
+**Painel (arquivos)**: `GET /painel/exportar?filtros` (CSV de agendamentos, R49) e `GET /painel/importar-modelo` (planilha-modelo).
+**Importação**: server actions em `src/app/painel/acoes-importacao.ts` (`enviarArquivoImportacao`, `analisarImportacao`, `confirmarImportacao`, `cancelarImportacao`), que validam o papel no servidor (R43) e usam `src/lib/importacao/` (leitura, campos, fontes).
+
+**Painel**: server actions em `src/app/painel/acoes.ts`: entrar/sair, novoAgendamentoManual, mudarStatus, registrarPagamentoLocal, salvarServico, salvarProfissional, adicionarFaixa/removerFaixa, adicionarBloqueio/removerBloqueio, salvarEmpresa, salvarTema, salvarRegras, salvarCampo, salvarCliente, salvarUnidade, estornarPagamentos, novoCliente.
 
 ## 5. Schema SQL
-- **Supabase/produção**: `supabase/migrations/20261021150000_agendou_schema.sql`, a fonte oficial. Contém:
+- **Supabase/produção**: `supabase/migrations/20261021150000_agendou_schema.sql` + `20261021180000_crm_importacao.sql` (tabela `importacao`, colunas de CRM no cliente, novos padrões), rodadas nessa ordem. É a fonte oficial. Contém:
   - 18 tabelas e as chaves estrangeiras **compostas** `(id, empresa_id)`, que impedem misturar dados de empresas diferentes (por exemplo, um agendamento da empresa A com um cliente da B);
   - restrição `EXCLUDE` contra sobreposição de horários (R10);
   - CHECKs das regras (formatos, prazos, status coerente com `cancelado_por`, Pix pendente com prazo);
@@ -156,6 +179,7 @@ Onboarding pela API do Supabase: `select public.criar_empresa('Nome', 'slug')` c
 6. **Pagamentos (sandbox)**: Pix com expiração e cartão tokenizado ✅
 7. **Notificações**: fila, log no painel, envio plugável e lembretes automáticos ✅
 8. **Complementos**: multi-unidade, estorno sandbox, pixel com consentimento, menu do painel no celular ✅
+9. **v3 (SaaS premium)**: sistema visual, dashboard/CRM com filtros e gráficos, agendamento público em etapas com "sem preferência" e gerenciamento por link, importação CSV/Excel ✅
 
 ## 8. Como rodar
 ```

@@ -1,0 +1,10 @@
+Nome do Cliente;Celular;E-mail;Aniversário;CPF;Obs
+Marcos Vinícius Andrade;(11) 98888-1111;marcos@exemplo.com;12/04/1991;529.982.247-25;Prefere máquina 2
+Ana Paula Ribeiro;11977772222;ana.ribeiro@exemplo;31/02/1990;;
+"Silva, Roberto";+55 11 96666-3333;roberto@exemplo.com;1985-07-20;111.111.111-11;"Cliente antigo; gosta de café"
+Sem Telefone;;semtel@exemplo.com;;;
+Telefone Curto;9999-1234;;;;
+Marcos Repetido;11 98888-1111;;;;
+Carlos Fictício;(11) 97777-6666;carlos@exemplo.com;;;Já existe na base
+Júlia Souza;21 99555-4444;julia@exemplo.com;05/11/1999;;
+Rodrigo Com Email;(11) 94444-3333;rodrigo@exemplo.com;;;Veio do sistema antigo

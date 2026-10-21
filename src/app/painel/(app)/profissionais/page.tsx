@@ -49,10 +49,10 @@ export default async function Page() {
         </label>
       )}
       <fieldset className="md:col-span-4">
-        <legend className="mb-1 text-sm text-slate-600">Serviços que realiza</legend>
+        <legend className="mb-1 text-sm muted">Serviços que realiza</legend>
         <div className="flex flex-wrap gap-2">
           {servicos.map((s) => (
-            <label key={s.id} className="flex items-center gap-1 rounded-lg border px-2 py-1 text-sm">
+            <label key={s.id} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-sm">
               <input type="checkbox" name="servicos" value={s.id} defaultChecked={p ? faz(p.id, s.id) : true} /> {s.nome}
             </label>
           ))}
@@ -63,19 +63,19 @@ export default async function Page() {
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-bold">Profissionais</h1>
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 font-semibold">Novo profissional</h2>
-        <p className="mb-3 text-xs text-slate-500">Começa com expediente padrão (seg–sex 9h–18h, sáb 9h–14h), que você ajusta em Horários.</p>
+      <h1 className="text-2xl font-semibold tracking-tight">Profissionais</h1>
+      <section className="card p-4 md:p-5">
+        <h2 className="mb-3 font-medium">Novo profissional</h2>
+        <p className="mb-3 text-xs muted">Começa com expediente padrão (seg–sex 9h–18h, sáb 9h–14h), que você ajusta em Horários.</p>
         <Form action={salvarProfissional} className="grid gap-3 md:grid-cols-4" botao="Adicionar" resetar>
           {campos()}
         </Form>
       </section>
       {profs.map((p) => (
-        <details key={p.id} className="rounded-2xl bg-white p-4 shadow-sm">
+        <details key={p.id} className="card p-4 md:p-5">
           <summary className="cursor-pointer">
             <span className="font-semibold">{p.nome}</span>{" "}
-            <span className="text-sm text-slate-500">
+            <span className="text-sm muted">
               comissão {p.comissao_pct}% {!p.ativo && "· inativo"}
             </span>
           </summary>

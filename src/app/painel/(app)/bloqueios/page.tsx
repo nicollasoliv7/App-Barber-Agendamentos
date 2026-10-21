@@ -16,9 +16,9 @@ export default async function Page() {
   );
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-bold">Folgas e bloqueios</h1>
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 font-semibold">Novo bloqueio</h2>
+      <h1 className="text-2xl font-semibold tracking-tight">Folgas e bloqueios</h1>
+      <section className="card p-4 md:p-5">
+        <h2 className="mb-3 font-medium">Novo bloqueio</h2>
         <Form action={adicionarBloqueio} className="grid gap-3 md:grid-cols-3" botao="Bloquear" resetar>
           <Campo rotulo="Quem">
             <select name="profissional" className={inp}>
@@ -47,10 +47,10 @@ export default async function Page() {
           </Campo>
         </Form>
       </section>
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 font-semibold">Próximos bloqueios</h2>
-        {bls.length === 0 && <p className="text-sm text-slate-400">Nenhum bloqueio futuro.</p>}
-        <ul className="divide-y text-sm">
+      <section className="card p-4 md:p-5">
+        <h2 className="mb-3 font-medium">Próximos bloqueios</h2>
+        {bls.length === 0 && <p className="text-sm faint">Nenhum bloqueio futuro.</p>}
+        <ul className="divide-hair text-sm">
           {bls.map((b) => (
             <li key={b.id} className="flex items-center justify-between py-2">
               <span>
@@ -58,7 +58,7 @@ export default async function Page() {
               </span>
               <form action={removerBloqueio}>
                 <input type="hidden" name="id" value={b.id} />
-                <button className="text-red-600">Remover</button>
+                <button className="text-[#ff9aa2]">Remover</button>
               </form>
             </li>
           ))}

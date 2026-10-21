@@ -16,15 +16,15 @@ export default async function Page() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Horários de atendimento</h1>
-        <p className="text-sm text-slate-500">Cada profissional pode ter várias faixas por dia. O intervalo de almoço é o espaço entre duas faixas.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Horários de atendimento</h1>
+        <p className="text-sm muted">Cada profissional pode ter várias faixas por dia. O intervalo de almoço é o espaço entre duas faixas.</p>
       </div>
       {profs.map((p) => (
-        <section key={p.id} className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="mb-3 font-semibold">{p.nome}</h2>
+        <section key={p.id} className="card p-4 md:p-5">
+          <h2 className="mb-3 font-medium">{p.nome}</h2>
           <div className="grid gap-2 md:grid-cols-7">
             {DIAS_SEMANA.map((nome, d) => (
-              <div key={d} className="rounded-lg border p-2 text-sm">
+              <div key={d} className="rounded-lg border border-white/10 p-2 text-sm">
                 <div className="mb-1 font-medium">{nome}</div>
                 {faixas
                   .filter((f) => f.profissional_id === p.id && f.dia_semana === d)
@@ -34,12 +34,12 @@ export default async function Page() {
                       <span>
                         {hhmm(f.inicio_min)}–{hhmm(f.fim_min)}
                       </span>
-                      <button className="text-red-600" aria-label="Remover faixa">
+                      <button className="text-[#ff9aa2]" aria-label="Remover faixa">
                         ×
                       </button>
                     </form>
                   ))}
-                {!faixas.some((f) => f.profissional_id === p.id && f.dia_semana === d) && <span className="text-slate-400">Fechado</span>}
+                {!faixas.some((f) => f.profissional_id === p.id && f.dia_semana === d) && <span className="faint">Fechado</span>}
               </div>
             ))}
           </div>

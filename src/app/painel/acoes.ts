@@ -8,7 +8,7 @@ import { criarAgendamento, mudarStatusPelaEmpresa } from "@/lib/agendamentos";
 import { instanteLocal, paraMinutos } from "@/lib/tempo";
 import { ErroNegocio } from "@/lib/tipos";
 import { configAgendamento } from "@/lib/empresa";
-import { isUuid } from "@/lib/validacao";
+import { isUuid, normalizarTelefone } from "@/lib/validacao";
 
 export type Estado = { erro?: string; ok?: string } | undefined;
 
@@ -349,8 +349,38 @@ export async function salvarCampo(_: Estado, f: FormData): Promise<Estado> {
 export async function salvarCliente(_: Estado, f: FormData): Promise<Estado> {
   const u = await exigirUsuario();
   return executar(async () => {
-    await q(`update cliente set nome=$1, email=$2 where id=$3 and empresa_id=$4`, [txt(f, "nome"), txt(f, "email") || null, txt(f, "id"), u.empresa_id]);
+    const nome = txt(f, "nome");
+    if (nome.length < 2) throw new ErroNegocio("Informe o nome");
+    const email = txt(f, "email");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroNegocio("E-mail inválido");
+    const r = await q(`update cliente set nome=$1, email=$2, observacoes=$3 where id=$4 and empresa_id=$5 returning id`, [
+      nome,
+      email || null,
+      txt(f, "observacoes").slice(0, 1000) || null,
+      txt(f, "id"),
+      u.empresa_id,
+    ]);
+    if (!r.length) throw new ErroNegocio("Cliente não encontrado");
     return "Cliente salvo";
+  });
+}
+
+export async function novoCliente(_: Estado, f: FormData): Promise<Estado> {
+  const u = await exigirUsuario();
+  return executar(async () => {
+    const nome = txt(f, "nome");
+    if (nome.length < 2) throw new ErroNegocio("Informe o nome");
+    const telefone = normalizarTelefone(txt(f, "telefone"));
+    if (!telefone) throw new ErroNegocio("Telefone inválido. Use DDD + número.");
+    const email = txt(f, "email");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroNegocio("E-mail inválido");
+    const r = await q(
+      `insert into cliente (empresa_id, nome, telefone, email, observacoes, origem) values ($1,$2,$3,$4,$5,'painel')
+       on conflict (empresa_id, telefone) do nothing returning id`,
+      [u.empresa_id, nome, telefone, email || null, txt(f, "observacoes") || null],
+    );
+    if (!r.length) throw new ErroNegocio("Já existe um cliente com esse telefone");
+    return "Cliente cadastrado";
   });
 }
 

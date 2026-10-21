@@ -19,14 +19,62 @@ export default async function Page() {
       [u.empresa_id],
     ),
   ]);
-  const card = "rounded-2xl bg-white p-4 shadow-sm";
+  const card = "card p-4 md:p-5";
+  const integracoes = [
+    {
+      nome: "Agendamento público",
+      ok: true,
+      estado: "",
+      texto: `Funcionando em /${e!.slug}, sem login para o cliente.`,
+    },
+    {
+      nome: "WhatsApp",
+      ok: !!process.env.WHATSAPP_API_URL,
+      estado: "Não configurado",
+      texto: process.env.WHATSAPP_API_URL
+        ? "Mensagens enviadas pelo provedor configurado."
+        : "Mensagens ficam registradas em Notificações, mas não são enviadas. Configure WHATSAPP_API_URL com um provedor.",
+    },
+    {
+      nome: "Pagamentos online",
+      ok: false,
+      estado: "Modo de teste",
+      texto: "Pix e cartão em sandbox: nenhum valor real é cobrado. Ainda não há provedor de pagamento conectado.",
+    },
+    {
+      nome: "Links nas mensagens",
+      ok: !!process.env.APP_URL,
+      estado: "Sem endereço",
+      texto: process.env.APP_URL
+        ? `Links de remarcar/cancelar apontam para ${process.env.APP_URL}.`
+        : "Defina APP_URL (endereço público do app) para incluir o link de remarcar/cancelar nas mensagens.",
+    },
+  ];
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-bold">Configurações</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+
+      <section className={card} aria-labelledby="titulo-integracoes">
+        <h2 id="titulo-integracoes" className="mb-1 font-medium">
+          Status das integrações
+        </h2>
+        <p className="mb-3 text-xs muted">O que já funciona de verdade e o que ainda depende de configuração.</p>
+        <ul className="grid gap-2 text-sm md:grid-cols-2">
+          {integracoes.map((i) => (
+            <li key={i.nome} className="flex items-start gap-3 rounded-lg border border-white/[0.08] p-3">
+              <span className={`badge ${i.ok ? "badge-ok" : "badge-warn"}`}>{i.ok ? "Ativo" : i.estado}</span>
+              <span>
+                <b className="font-medium">{i.nome}</b>
+                <span className="block text-xs muted">{i.texto}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className={card}>
-        <h2 className="mb-3 font-semibold">Empresa</h2>
+        <h2 className="mb-3 font-medium">Empresa</h2>
         <Form action={salvarEmpresa} className="grid gap-3 md:grid-cols-2">
           <Campo rotulo="Nome">
             <input name="nome" required defaultValue={e!.nome} className={inp} />
@@ -57,13 +105,13 @@ export default async function Page() {
 
       {e!.multiunidade && (
         <section className={card}>
-          <h2 className="mb-1 font-semibold">Unidades</h2>
-          <p className="mb-3 text-xs text-slate-500">
+          <h2 className="mb-1 font-medium">Unidades</h2>
+          <p className="mb-3 text-xs muted">
             O cliente escolhe a unidade na página pública e só vê os profissionais dela (ou os marcados para todas as unidades).
           </p>
           <div className="grid gap-2">
             {unidades.map((un) => (
-              <Form key={un.id} action={salvarUnidade} className="grid gap-2 border-b pb-3 md:grid-cols-4 md:items-end">
+              <Form key={un.id} action={salvarUnidade} className="grid gap-2 border-b border-white/[0.08] pb-3 md:grid-cols-4 md:items-end">
                 <input type="hidden" name="id" value={un.id} />
                 <Campo rotulo="Nome">
                   <input name="nome" required defaultValue={un.nome} className={inp} />
@@ -95,7 +143,7 @@ export default async function Page() {
       )}
 
       <section className={card}>
-        <h2 className="mb-3 font-semibold">Cores da página pública</h2>
+        <h2 className="mb-3 font-medium">Cores da página pública</h2>
         <Form action={salvarTema} className="grid gap-3 grid-cols-2 md:grid-cols-4">
           {(
             [
@@ -106,14 +154,14 @@ export default async function Page() {
             ] as const
           ).map(([k, r]) => (
             <Campo key={k} rotulo={r}>
-              <input type="color" name={k} defaultValue={tema[k]} className="h-10 w-full rounded-lg border" />
+              <input type="color" name={k} defaultValue={tema[k]} className="h-10 w-full cursor-pointer rounded-lg border border-white/15 bg-transparent" />
             </Campo>
           ))}
         </Form>
       </section>
 
       <section className={card}>
-        <h2 className="mb-3 font-semibold">Regras de agendamento e pagamento</h2>
+        <h2 className="mb-3 font-medium">Regras de agendamento e pagamento</h2>
         <Form action={salvarRegras} className="grid gap-3 md:grid-cols-3">
           <Campo rotulo="Intervalo entre horários oferecidos (min)">
             <input type="number" name="intervalo_slots_min" min={5} max={120} defaultValue={cfg.intervalo_slots_min} className={inp} />
@@ -151,14 +199,17 @@ export default async function Page() {
             <input type="number" name="pix_expiracao_min" min={1} max={60} defaultValue={cfg.pix_expiracao_min} className={inp} />
           </Campo>
         </Form>
-        <p className="mt-3 text-xs text-slate-500">Pagamentos rodam em modo de teste (sandbox): nenhum valor real é cobrado.</p>
+        <p className="mt-3 text-xs text-[#ffcf8a]">
+          Pagamentos online estão em modo de teste (sandbox): nenhum valor real é cobrado. Para a maioria das barbearias, deixe &quot;Desativado&quot; até conectar um
+          provedor de pagamento.
+        </p>
       </section>
 
       <section className={card}>
-        <h2 className="mb-3 font-semibold">Campos extras do formulário de agendamento</h2>
+        <h2 className="mb-3 font-medium">Campos extras do formulário de agendamento</h2>
         <div className="grid gap-2">
           {campos.map((c) => (
-            <Form key={c.id} action={salvarCampo} className="flex flex-wrap items-end gap-3 border-b pb-2">
+            <Form key={c.id} action={salvarCampo} className="flex flex-wrap items-end gap-3 border-b border-white/[0.08] pb-2">
               <input type="hidden" name="id" value={c.id} />
               <Campo rotulo={`Rótulo (${c.tipo})`}>
                 <input name="rotulo" defaultValue={c.rotulo} className={inp} />
@@ -192,8 +243,8 @@ export default async function Page() {
       </section>
 
       <section className={card}>
-        <h2 className="mb-1 font-semibold">Plano</h2>
-        <p className="text-sm text-slate-500">Gestão de assinatura da plataforma: fora do escopo desta versão (ver LOG.md).</p>
+        <h2 className="mb-1 font-medium">Plano</h2>
+        <p className="text-sm muted">Gestão de assinatura da plataforma: fora do escopo desta versão (ver LOG.md).</p>
       </section>
     </div>
   );

@@ -14,17 +14,17 @@ export default async function Page() {
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Notificações</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold tracking-tight">Notificações</h1>
+        <p className="text-sm muted">
           Mensagens de WhatsApp/SMS geradas pelo sistema. Sem um provedor configurado (variável <code>WHATSAPP_API_URL</code>), o envio é
           simulado e a mensagem fica registrada aqui.
         </p>
       </div>
       <ul className="grid gap-2">
-        {ns.length === 0 && <li className="text-slate-400">Nenhuma notificação ainda.</li>}
+        {ns.length === 0 && <li className="faint">Nenhuma notificação ainda.</li>}
         {ns.map((n) => (
-          <li key={n.id} className="rounded-xl bg-white p-3 text-sm shadow-sm">
-            <div className="flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+          <li key={n.id} className="card p-3 text-sm">
+            <div className="flex flex-wrap justify-between gap-2 text-xs muted">
               <span>
                 {n.canal} → {formatarTelefone(n.destino)}
               </span>

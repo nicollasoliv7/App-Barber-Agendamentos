@@ -45,18 +45,18 @@ export default async function Page() {
   const servicos = await q<Servico>(`select * from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]);
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-bold">Serviços</h1>
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 font-semibold">Novo serviço</h2>
+      <h1 className="text-2xl font-semibold tracking-tight">Serviços</h1>
+      <section className="card p-4 md:p-5">
+        <h2 className="mb-3 font-medium">Novo serviço</h2>
         <Form action={salvarServico} className="grid gap-3 md:grid-cols-4" botao="Adicionar" resetar>
           <Campos />
         </Form>
       </section>
       {servicos.map((s) => (
-        <details key={s.id} className="rounded-2xl bg-white p-4 shadow-sm">
+        <details key={s.id} className="card p-4 md:p-5">
           <summary className="cursor-pointer flex flex-wrap gap-x-3 items-baseline">
             <span className="font-semibold">{s.nome}</span>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm muted">
               R$ {preco(s.preco_centavos)} · {s.duracao_min} min {!s.ativo && "· inativo"}
             </span>
           </summary>

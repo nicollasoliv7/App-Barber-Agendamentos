@@ -23,16 +23,18 @@ export function Form({
     if (resetar && estado?.ok) ref.current?.reset();
   }, [estado, resetar]);
   return (
-    <form ref={ref} action={acao} className={className}>
+    <form ref={ref} action={acao} className={className} aria-busy={pendente}>
       {children}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {botao && (
-          <button disabled={pendente} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          <button disabled={pendente} className="btn btn-quente">
             {pendente ? "Salvando…" : botao}
           </button>
         )}
-        {estado?.erro && <span className="text-sm text-red-600">{estado.erro}</span>}
-        {estado?.ok && !pendente && <span className="text-sm text-teal-700">{estado.ok}</span>}
+        <span role="status" aria-live="polite" className="text-sm">
+          {estado?.erro && <span className="text-[#ff9aa2]">{estado.erro}</span>}
+          {estado?.ok && !pendente && <span className="text-[#7ee2b0]">✓ {estado.ok}</span>}
+        </span>
       </div>
     </form>
   );
@@ -40,11 +42,23 @@ export function Form({
 
 export function Campo({ rotulo, children, className }: { rotulo: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className={`grid gap-1 text-sm ${className ?? ""}`}>
-      <span className="text-slate-600">{rotulo}</span>
+    <label className={`grid gap-1.5 ${className ?? ""}`}>
+      <span className="rotulo">{rotulo}</span>
       {children}
     </label>
   );
 }
 
-export const inp = "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
+export const inp = "input";
+
+export function Cabecalho({ titulo, descricao, children }: { titulo: string; descricao?: string; children?: React.ReactNode }) {
+  return (
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">{titulo}</h1>
+        {descricao && <p className="mt-1 max-w-2xl text-sm muted">{descricao}</p>}
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </header>
+  );
+}

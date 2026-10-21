@@ -97,3 +97,47 @@ Teste final no seu PC: o cliente fictício "Paulo Teste Windows" agendou Barba �
 - `db/supabase_extra.sql` foi removido, porque a migration nova já o inclui.
 
 **Pendências**: as mesmas da entrada anterior. A migration substitui o passo "rodar `db/supabase_extra.sql`".
+
+---
+
+## 2026-10-21 (tarde) — v3: SaaS premium, CRM, agendamento sem login e importação
+
+**Pedido**: remodelar o app com a referência visual (aurora quente, vidro, botões em tecla), um CRM/dashboard fácil, um agendamento público sem login e a importação de clientes de outros sistemas, tudo de ponta a ponta e com honestidade sobre integrações.
+
+**Feito**
+- **Sistema visual**: tema escuro `#07080a` com aurora quente animada só em CSS (respeita `prefers-reduced-motion`), Inter + Geist Mono self-hosted, componentes `.glass` `.card` `.btn-key` `.btn-quente` `.chip` `.badge` `.tabela` e componentes React (`Aurora`, `Icone`, `Kpi`, `StatusBadge`). Aplicado à landing, à página pública, ao login e a todas as telas do painel.
+- **Landing** (`/`): hero com menu em pílula, botões em tecla e um mockup da agenda do dia.
+- **CRM e painel**:
+  - **Visão geral** (`/painel`): 6 indicadores com comparação ao período anterior, receita por dia (gráfico com tooltip, teclado e versão em tabela), serviços mais procurados, melhores clientes, próximos horários, contagem por status e cartão do link público (copiar, WhatsApp, QR Code em PNG). Filtros por período, serviço, profissional, status e cliente, guardados na URL.
+  - **Agendamentos** (`/painel/agendamentos`): histórico com filtros, paginação, ações rápidas e exportação CSV (protegida contra *CSV injection*).
+  - **Clientes**: busca, segmentos (com horário, sumidos 45+ dias, novos, importados), ordenação, cadastro manual e **ficha** com indicadores, histórico, serviços preferidos e observações.
+  - **Agenda do dia** foi para `/painel/agenda`, sem perder nenhuma função.
+- **Agendamento público sem login**:
+  - fluxo em etapas mobile-first com barra de progresso e barra fixa de ação;
+  - opção **"Sem preferência"** (R35), dias em faixa horizontal e horários por turno;
+  - estados de carregamento (esqueletos) e de erro, com o 409 tratado;
+  - comprovante com `.ics` e Google Agenda, além de **link de gerenciar** para remarcar e cancelar sem senha (R36). Os dados do cliente podem ser lembrados no aparelho.
+- **Importação de clientes** (`/painel/clientes/importar`):
+  - CSV (detecta separador e codificação) e Excel `.xlsx`;
+  - mapeamento automático de colunas por sinônimos, DDD padrão e prévia;
+  - validação **no servidor**, duplicados no arquivo e no banco, e política "manter" ou "completar vazios";
+  - relatório baixável, histórico de importações e dados brutos descartados ao concluir;
+  - a tela informa o que é e o que não é importado, e que não há integração por API ainda (a estrutura existe em `fontes.ts`).
+- **Banco**: tabela `importacao`, colunas `cliente.observacoes/origem/importacao_id` e nova migration `supabase/migrations/20261021180000_crm_importacao.sql` (RLS: o gestor vê o histórico, nunca os dados brutos). A migration anterior não foi alterada.
+- **Honestidade**:
+  - quadro "Status das integrações" em Configurações (WhatsApp, pagamentos, APP_URL);
+  - a mensagem "enviamos no WhatsApp" só aparece com provedor configurado;
+  - o pagamento online agora vem **desativado** por padrão nas empresas novas (sandbox continua disponível e rotulado).
+- **Demonstração**: o banco de exemplo traz 45 dias de histórico fictício, para o painel não abrir vazio.
+- **Testes** (`e2e/`): fluxo completo, Pix e histórico, e largura responsiva em 1440, 1024 e 390 px, todos aprovados. A migration nova foi testada num Postgres 16 simulando o Supabase. Lint, tipos e build limpos.
+
+**Decisões**
+- `/painel` passou a ser a Visão geral (o pedido prioriza o dashboard). A agenda do dia fica a um clique.
+- Gráficos feitos à mão em SVG (sem biblioteca), com uma cor validada para o fundo escuro.
+- O aviso de cookies só aparece quando a empresa usa pixel de campanha, que é o único rastreamento da página.
+
+**Pendências (externas)**
+1. Provedor de WhatsApp (`WHATSAPP_API_URL`) e `APP_URL` para os links nas mensagens.
+2. Provedor de pagamento real (hoje só sandbox).
+3. Conectores de importação por API, quando os sistemas de origem oferecerem API.
+4. Painel de referência: continua dependendo de login para completar o mapeamento B1–B16.

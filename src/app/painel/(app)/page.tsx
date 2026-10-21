@@ -1,237 +1,183 @@
 import Link from "next/link";
+import QRCode from "qrcode";
 import { q } from "@/lib/db";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
-import { diaLocal, formatarDia, instanteLocal, minutosLocal, hhmm, reais, somarDias } from "@/lib/tempo";
+import { dashboard, filtrosParaQuery, lerFiltros } from "@/lib/relatorios";
+import { origemApp } from "@/lib/origem";
+import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
-import { estornarPagamentos, mudarStatus, novoAgendamentoManual, registrarPagamentoLocal } from "../acoes";
-import { Campo, Form, inp } from "../Form";
+import { Icone, Kpi, StatusBadge } from "@/components/ui";
+import { Cabecalho } from "../Form";
+import Filtros from "../componentes/Filtros";
+import GraficoReceita from "../componentes/GraficoReceita";
+import LinkPublico from "../componentes/LinkPublico";
 
-export const metadata = { title: "Agenda" };
+export const metadata = { title: "Visão geral" };
 
-const COR: Record<string, string> = {
-  confirmado: "bg-teal-100 text-teal-800",
-  pendente_pagamento: "bg-amber-100 text-amber-800",
-  concluido: "bg-slate-200 text-slate-700",
-  cancelado: "bg-red-100 text-red-700 line-through",
-  faltou: "bg-orange-100 text-orange-800",
-};
-const ROT: Record<string, string> = {
-  confirmado: "Confirmado",
-  pendente_pagamento: "Aguardando Pix",
-  concluido: "Concluído",
-  cancelado: "Cancelado",
-  faltou: "Faltou",
-};
+const fmtData = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
-type Linha = {
-  id: string;
-  inicio: Date;
-  fim: Date;
-  status: string;
-  origem: string;
-  preco_centavos: number;
-  cliente: string;
-  telefone: string;
-  servico: string;
-  profissional_id: string;
-  pago: number;
-  cancelado_por: string | null;
-};
-
-export default async function Agenda({ searchParams }: PageProps<"/painel">) {
+export default async function VisaoGeral({ searchParams }: PageProps<"/painel">) {
   const u = await usuarioOuLogin();
   await expirarPendentes();
   const cfg = await configAgendamento(u.empresa_id);
-  const sp = await searchParams;
-  const hoje = diaLocal(new Date(), cfg.fuso_horario);
-  const dia = typeof sp.dia === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.dia) ? sp.dia : hoje;
-  const de = instanteLocal(dia, 0, cfg.fuso_horario);
-  const ate = instanteLocal(somarDias(dia, 1), 0, cfg.fuso_horario);
-
-  const [profs, servicos, ags, bloqueios] = await Promise.all([
-    q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 and ativo order by nome`, [u.empresa_id]),
-    q<{ id: string; nome: string; duracao_min: number }>(
-      `select id, nome, duracao_min from servico where empresa_id = $1 and ativo order by ordem, nome`,
-      [u.empresa_id],
-    ),
-    q<Linha>(
-      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por,
-              c.nome as cliente, c.telefone, s.nome as servico,
-              coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
-       from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
-       where a.empresa_id = $1 and a.inicio >= $2 and a.inicio < $3 order by a.inicio`,
-      [u.empresa_id, de, ate],
-    ),
-    q<{ profissional_id: string | null; inicio: Date; fim: Date; motivo: string | null }>(
-      `select profissional_id, inicio, fim, motivo from bloqueio where empresa_id = $1 and inicio < $3 and fim > $2`,
-      [u.empresa_id, de, ate],
-    ),
+  const f = lerFiltros(await searchParams, cfg.fuso_horario);
+  const [d, servicos, profissionais, origem, [{ total_clientes }]] = await Promise.all([
+    dashboard(u.empresa_id, f),
+    q<{ id: string; nome: string }>(`select id, nome from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]),
+    q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 order by nome`, [u.empresa_id]),
+    origemApp(),
+    q<{ total_clientes: number }>(`select count(*)::int as total_clientes from cliente where empresa_id = $1`, [u.empresa_id]),
   ]);
-
-  const ativos = ags.filter((a) => a.status !== "cancelado");
-  const previsto = ativos.filter((a) => a.status !== "faltou").reduce((s, a) => s + a.preco_centavos, 0);
-  const recebido = ags.reduce((s, a) => s + a.pago, 0);
-  const hm = (d: Date) => hhmm(minutosLocal(new Date(d), cfg.fuso_horario));
+  const caminho = `/${u.empresa_slug}`;
+  const qr = await QRCode.toDataURL(`${origem}${caminho}`, { margin: 1, width: 320 });
+  const maxServ = Math.max(...d.topServicos.map((s) => s.qtd), 1);
+  const comp = d.dias === 1 ? "vs. dia anterior" : `vs. ${d.dias} dias anteriores`;
+  const listar = (extra: Record<string, string>) => `/painel/agendamentos?${filtrosParaQuery(f, extra)}`;
 
   return (
-    <div className="grid gap-6">
-      <header className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold mr-auto">Agenda</h1>
-        <Link href={`/painel?dia=${somarDias(dia, -1)}`} className="rounded-lg bg-white px-3 py-2 shadow-sm" aria-label="Dia anterior">
-          ‹
+    <>
+      <Cabecalho
+        titulo={`Olá, ${u.nome.split(" ")[0]}`}
+        descricao={`Resumo da ${u.empresa_nome} de ${fmtData(f.de)} a ${fmtData(f.ate)}. Use os filtros para focar num serviço, profissional ou status.`}
+      >
+        <Link href="/painel/agenda" className="btn btn-key">
+          <Icone nome="calendario" tamanho={15} /> Agenda de hoje
         </Link>
-        <form className="flex gap-2">
-          <input type="date" name="dia" defaultValue={dia} className={inp} />
-          <button className="rounded-lg bg-white px-3 py-2 text-sm shadow-sm">Ir</button>
-        </form>
-        <Link href={`/painel?dia=${somarDias(dia, 1)}`} className="rounded-lg bg-white px-3 py-2 shadow-sm" aria-label="Próximo dia">
-          ›
-        </Link>
-        {dia !== hoje && (
-          <Link href="/painel" className="text-sm text-teal-700 underline">
-            Hoje
-          </Link>
-        )}
-      </header>
+      </Cabecalho>
 
-      <p className="-mt-4 text-slate-500 first-letter:uppercase">{formatarDia(dia)}</p>
+      <Filtros servicos={servicos} profissionais={profissionais} periodoAtual={f.periodo} de={f.de} ate={f.ate} busca />
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi rotulo="Agendamentos" valor={String(ativos.length)} />
-        <Kpi rotulo="Aguardando Pix" valor={String(ags.filter((a) => a.status === "pendente_pagamento").length)} />
-        <Kpi rotulo="Previsto no dia" valor={reais(previsto)} />
-        <Kpi rotulo="Recebido" valor={reais(recebido)} />
+      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <Kpi icone="dinheiro" rotulo="Faturamento realizado" valor={reais(d.kpis.realizado.valor)} variacao={d.kpis.realizado.var} detalhe={comp} />
+        <Kpi icone="grafico" rotulo="Receita prevista" valor={reais(d.kpis.previsto.valor)} variacao={d.kpis.previsto.var} detalhe="confirm. + concl." />
+        <Kpi icone="calendario" rotulo="Agendamentos" valor={String(d.kpis.agendamentos.valor)} variacao={d.kpis.agendamentos.var} detalhe="sem cancelados" />
+        <Kpi icone="tesoura" rotulo="Ticket médio" valor={reais(d.kpis.ticket.valor)} variacao={d.kpis.ticket.var} detalhe="por atendimento" />
+        <Kpi icone="usuarios" rotulo="Clientes novos" valor={String(d.kpis.novosClientes.valor)} variacao={d.kpis.novosClientes.var} detalhe={`${total_clientes} no total`} />
+        <Kpi icone="alerta" rotulo="Cancelamentos + faltas" valor={`${d.kpis.taxaPerda}%`} detalhe={`${d.atual.cancelados} canc. · ${d.atual.faltas} faltas`} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {profs.map((p) => {
-          const lista = ags.filter((a) => a.profissional_id === p.id);
-          const bls = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === p.id);
-          return (
-            <div key={p.id} className="rounded-2xl bg-white p-4 shadow-sm">
-              <h2 className="mb-3 font-semibold">{p.nome}</h2>
-              {bls.map((b, i) => (
-                <div key={i} className="mb-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-                  Bloqueado {hm(b.inicio)}–{hm(b.fim)} {b.motivo ? `· ${b.motivo}` : ""}
-                </div>
-              ))}
-              {lista.length === 0 && <p className="text-sm text-slate-400">Nenhum agendamento.</p>}
-              <ul className="grid gap-2">
-                {lista.map((a) => (
-                  <li key={a.id} className="rounded-xl border border-slate-200 p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="font-semibold">
-                          {hm(a.inicio)}–{hm(a.fim)} · {a.servico}
-                        </div>
-                        <div>
-                          {a.cliente} ·{" "}
-                          <a className="text-teal-700" href={`https://wa.me/55${a.telefone}`} target="_blank" rel="noreferrer">
-                            {formatarTelefone(a.telefone)}
-                          </a>
-                        </div>
-                        <div className="text-slate-500">
-                          {reais(a.preco_centavos)}
-                          {a.pago > 0 && ` · pago ${reais(a.pago)}`}
-                          {a.origem === "painel" && " · manual"}
-                        </div>
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${COR[a.status]}`}>{ROT[a.status]}</span>
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <GraficoReceita serie={d.serie} />
+        <LinkPublico url={`${origem}${caminho}`} caminho={caminho} nome={u.empresa_nome} qr={qr} />
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <section className="card p-4 md:p-5" aria-labelledby="titulo-servicos">
+          <h2 id="titulo-servicos" className="font-medium">
+            Serviços mais procurados
+          </h2>
+          <p className="text-xs muted">Agendamentos no período (sem cancelados)</p>
+          {d.topServicos.length === 0 ? (
+            <p className="py-10 text-center text-sm muted">Sem agendamentos no período.</p>
+          ) : (
+            <ul className="mt-4 grid gap-3">
+              {d.topServicos.map((s) => (
+                <li key={s.id}>
+                  <Link href={listar({ servico: s.id })} className="group block" title={`${s.nome}: ${s.qtd} agendamentos, ${reais(s.valor)}`}>
+                    <div className="mb-1 flex justify-between gap-2 text-sm">
+                      <span className="truncate group-hover:underline underline-offset-2">{s.nome}</span>
+                      <span className="num muted">
+                        {s.qtd} · {reais(s.valor)}
+                      </span>
                     </div>
-                    {a.status === "cancelado" && a.pago > 0 && (
-                      <form action={estornarPagamentos} className="mt-2">
-                        <input type="hidden" name="id" value={a.id} />
-                        <button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">Estornar pagamento (teste)</button>
-                      </form>
-                    )}
-                    {a.status !== "cancelado" && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {(["concluido", "faltou", "cancelado"] as const)
-                          .filter((s) => s !== a.status)
-                          .map((s) => (
-                            <form key={s} action={mudarStatus}>
-                              <input type="hidden" name="id" value={a.id} />
-                              <input type="hidden" name="status" value={s} />
-                              <button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">
-                                {s === "concluido" ? "Concluir" : s === "faltou" ? "Faltou" : "Cancelar"}
-                              </button>
-                            </form>
-                          ))}
-                        {a.status !== "confirmado" && (
-                          <form action={mudarStatus}>
-                            <input type="hidden" name="id" value={a.id} />
-                            <input type="hidden" name="status" value="confirmado" />
-                            <button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">Confirmar</button>
-                          </form>
-                        )}
-                        {a.pago < a.preco_centavos && (
-                          <form action={registrarPagamentoLocal}>
-                            <input type="hidden" name="id" value={a.id} />
-                            <button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">Recebi no local</button>
-                          </form>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                    <div className="h-2 rounded-full bg-white/[0.05]">
+                      <div className="h-2 rounded-r-[4px] rounded-l-full bg-[var(--chart)]" style={{ width: `${Math.max(2, (s.qtd / maxServ) * 100)}%` }} />
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="card p-4 md:p-5" aria-labelledby="titulo-clientes">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 id="titulo-clientes" className="font-medium">
+                Melhores clientes
+              </h2>
+              <p className="text-xs muted">Por valor no período</p>
             </div>
-          );
-        })}
-      </section>
-
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 font-semibold">Novo agendamento manual</h2>
-        <Form action={novoAgendamentoManual} className="grid gap-3 md:grid-cols-4" botao="Agendar" resetar>
-          <Campo rotulo="Serviço">
-            <select name="servico" required className={inp}>
-              {servicos.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome} ({s.duracao_min} min)
-                </option>
+            <Link href="/painel/clientes" className="text-xs muted hover:text-white">
+              Ver todos →
+            </Link>
+          </div>
+          {d.topClientes.length === 0 ? (
+            <p className="py-10 text-center text-sm muted">Sem clientes no período.</p>
+          ) : (
+            <ul className="mt-3 divide-hair">
+              {d.topClientes.map((c, i) => (
+                <li key={c.id}>
+                  <Link href={`/painel/clientes/${c.id}`} className="flex items-center gap-3 py-2.5 hover:bg-white/[0.02]">
+                    <span className="mono w-4 text-xs faint">{i + 1}</span>
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-white/[0.06] text-xs font-semibold">
+                      {c.nome
+                        .split(" ")
+                        .map((p) => p[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">{c.nome}</span>
+                      <span className="block text-xs muted">
+                        {formatarTelefone(c.telefone)} · {c.visitas} visita{c.visitas > 1 ? "s" : ""}
+                      </span>
+                    </span>
+                    <span className="num text-sm">{reais(c.valor)}</span>
+                  </Link>
+                </li>
               ))}
-            </select>
-          </Campo>
-          <Campo rotulo="Profissional">
-            <select name="profissional" required className={inp}>
-              {profs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo rotulo="Dia">
-            <input type="date" name="dia" required defaultValue={dia} className={inp} />
-          </Campo>
-          <Campo rotulo="Hora">
-            <input type="time" name="hora" required step={300} className={inp} />
-          </Campo>
-          <Campo rotulo="Nome do cliente" className="md:col-span-2">
-            <input name="nome" required className={inp} />
-          </Campo>
-          <Campo rotulo="Telefone">
-            <input name="telefone" required inputMode="tel" placeholder="(11) 91234-5678" className={inp} />
-          </Campo>
-          <Campo rotulo="Observação">
-            <input name="observacao" className={inp} />
-          </Campo>
-          <p className="md:col-span-4 text-xs text-slate-500">
-            Agendamento manual respeita o expediente, as folgas e os conflitos, mas ignora a antecedência mínima.
-          </p>
-        </Form>
-      </section>
-    </div>
-  );
-}
+            </ul>
+          )}
+        </section>
 
-function Kpi({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="text-xs text-slate-500">{rotulo}</div>
-      <div className="text-xl font-bold">{valor}</div>
-    </div>
+        <section className="card p-4 md:p-5 lg:col-span-2 xl:col-span-1" aria-labelledby="titulo-proximos">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 id="titulo-proximos" className="font-medium">
+                Próximos horários
+              </h2>
+              <p className="text-xs muted">A partir de agora</p>
+            </div>
+            <Link href="/painel/agenda" className="text-xs muted hover:text-white">
+              Agenda →
+            </Link>
+          </div>
+          {d.proximos.length === 0 ? (
+            <p className="py-10 text-center text-sm muted">Nenhum horário marcado ainda.</p>
+          ) : (
+            <ul className="mt-3 divide-hair">
+              {d.proximos.map((a) => (
+                <li key={a.id} className="flex items-center gap-3 py-2.5">
+                  <span className="mono w-[86px] shrink-0 text-xs text-[var(--amber)]">{formatarDataHora(a.inicio, d.fuso).replace(",", "")}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm">{a.cliente}</span>
+                    <span className="block truncate text-xs muted">
+                      {a.servico} · {a.profissional}
+                    </span>
+                  </span>
+                  {a.status !== "confirmado" && <StatusBadge status={a.status} />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <section aria-label="Agendamentos por status" className="mt-6 flex flex-wrap gap-2">
+        {(["confirmado", "concluido", "pendente_pagamento", "faltou", "cancelado"] as const).map((s) => (
+          <Link key={s} href={listar({ status: s })} className="card card-hover flex items-center gap-3 px-3 py-2 text-sm">
+            <StatusBadge status={s} />
+            <span className="num font-semibold">{d.porStatus[s] ?? 0}</span>
+          </Link>
+        ))}
+        <Link href={listar({})} className="btn btn-ghost ml-auto">
+          Ver lista completa <Icone nome="seta" tamanho={14} />
+        </Link>
+      </section>
+    </>
   );
 }

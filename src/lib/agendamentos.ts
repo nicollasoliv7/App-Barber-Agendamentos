@@ -1,7 +1,7 @@
 import "server-only";
 import { tx, type Executor } from "./db";
 import { configAgendamento } from "./empresa";
-import { expirarPendentes, horariosLivres } from "./disponibilidade";
+import { expirarPendentes, horariosLivres, profissionaisElegiveis } from "./disponibilidade";
 import { notificar } from "./notificacoes";
 import { formatarDataHora, instanteLocal, paraMinutos, reais } from "./tempo";
 import { ErroNegocio, type Agendamento, type CampoPersonalizado } from "./tipos";
@@ -11,7 +11,9 @@ import { tokenAleatorio } from "./senha";
 export interface NovoAgendamento {
   empresaId: string;
   servicoId: string;
+  /** id do profissional ou "qualquer" (sem preferência: o sistema escolhe quem está livre) */
   profissionalId: string;
+  unidadeId?: string | null;
   dia: string; // YYYY-MM-DD
   hora: string; // HH:MM
   nome: string;
@@ -60,15 +62,35 @@ export async function criarAgendamento(dados: NovoAgendamento): Promise<Agendame
 
   return tx(async (t) => {
     await expirarPendentes(t);
-    // serializa agendamentos do mesmo profissional (Postgres real); no PGlite a transação já é exclusiva
-    await t.query(`select id from profissional where id = $1 for update`, [dados.profissionalId]);
     const cfg = await configAgendamento(dados.empresaId, t);
+    const minuto = paraMinutos(dados.hora);
+
+    // Sem preferência: escolhe, entre os profissionais livres nesse horário, o que tem menos atendimentos no dia
+    if (dados.profissionalId === "qualquer") {
+      const candidatos = await profissionaisElegiveis(t, dados.empresaId, dados.servicoId, dados.unidadeId ?? null);
+      const livres: { id: string; carga: number }[] = [];
+      for (const p of candidatos) {
+        const hs = await horariosLivres(dados.empresaId, dados.servicoId, p.id, dados.dia, { ignorarAntecedencia: painel }, t);
+        if (!hs.includes(minuto)) continue;
+        const [{ n }] = await t.query<{ n: number }>(
+          `select count(*)::int as n from agendamento where profissional_id = $1 and status in ('confirmado','pendente_pagamento','concluido')
+             and inicio >= $2 and inicio < $2::timestamptz + interval '1 day'`,
+          [p.id, instanteLocal(dados.dia, 0, cfg.fuso_horario)],
+        );
+        livres.push({ id: p.id, carga: n });
+      }
+      if (!livres.length) throw new ErroNegocio("Esse horário acabou de ser reservado. Escolha outro.", 409);
+      livres.sort((a, b) => a.carga - b.carga);
+      dados = { ...dados, profissionalId: livres[0].id };
+    }
+
+    // serializa agendamentos do mesmo profissional (Postgres real); no PGlite a transação já é exclusiva
+    await t.query(`select id from profissional where id = $1 and empresa_id = $2 for update`, [dados.profissionalId, dados.empresaId]);
     const campos = await t.query<CampoPersonalizado>(
       `select * from campo_personalizado where empresa_id = $1 and ativo`,
       [dados.empresaId],
     );
     const extras = validarExtras(campos, dados.extras ?? {});
-    const minuto = paraMinutos(dados.hora);
     const livres = await horariosLivres(
       dados.empresaId,
       dados.servicoId,
@@ -85,8 +107,8 @@ export async function criarAgendamento(dados: NovoAgendamento): Promise<Agendame
     );
     if (!serv.ativo && !painel) throw new ErroNegocio("Serviço indisponível");
     const [prof] = await t.query<{ nome: string }>(`select nome from profissional where id = $1`, [dados.profissionalId]);
-    const [emp] = await t.query<{ nome: string; telefone_whatsapp: string | null }>(
-      `select nome, telefone_whatsapp from empresa where id = $1`,
+    const [emp] = await t.query<{ nome: string; slug: string; telefone_whatsapp: string | null }>(
+      `select nome, slug, telefone_whatsapp from empresa where id = $1`,
       [dados.empresaId],
     );
 
@@ -132,15 +154,16 @@ export async function notificarConfirmacao(
     telefone: string;
     servico: string;
     profissional: string;
-    empresa: { nome: string; telefone_whatsapp: string | null };
+    empresa: { nome: string; slug?: string; telefone_whatsapp: string | null };
   },
 ) {
   const quando = formatarDataHora(ag.inicio);
+  const link = linkGerenciar(info.empresa.slug, ag);
   await notificar(t, {
     empresaId: ag.empresa_id,
     agendamentoId: ag.id,
     destino: info.telefone,
-    mensagem: `Olá, ${info.cliente.split(" ")[0]}! Seu horário na ${info.empresa.nome} está confirmado: ${info.servico} com ${info.profissional}, ${quando}. Valor: ${reais(ag.preco_centavos)}.`,
+    mensagem: `Olá, ${info.cliente.split(" ")[0]}! Seu horário na ${info.empresa.nome} está confirmado: ${info.servico} com ${info.profissional}, ${quando}. Valor: ${reais(ag.preco_centavos)}.${link ? ` Para remarcar ou cancelar: ${link}` : ""}`,
   });
   if (info.empresa.telefone_whatsapp) {
     await notificar(t, {
@@ -152,20 +175,32 @@ export async function notificarConfirmacao(
   }
 }
 
-async function carregarDoCliente(t: Executor, id: string, clienteId: string) {
+/** Link para o cliente gerenciar o agendamento sem login (precisa de APP_URL para virar link absoluto). */
+export function linkGerenciar(slug: string | undefined, ag: { id: string; token_publico: string }): string | null {
+  const base = process.env.APP_URL?.replace(/\/$/, "");
+  if (!base || !slug) return null;
+  return `${base}/${slug}/agendamento/${ag.id}?t=${ag.token_publico}`;
+}
+
+/** Quem pode mexer no agendamento: o cliente logado OU quem tem o link com o token secreto. */
+export type AcessoCliente = string | { clienteId?: string | null; token?: string | null };
+
+async function carregarDoCliente(t: Executor, id: string, acesso: AcessoCliente) {
+  const a = typeof acesso === "string" ? { clienteId: acesso, token: null } : acesso;
+  if (!a.clienteId && !(a.token && a.token.length >= 20)) throw new ErroNegocio("Acesso negado", 403);
   const [ag] = await t.query<Agendamento & { cliente_telefone: string; servico_nome: string; empresa_nome: string }>(
     `select a.*, c.telefone as cliente_telefone, s.nome as servico_nome, e.nome as empresa_nome
      from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
      join empresa e on e.id = a.empresa_id
-     where a.id = $1 and a.cliente_id = $2 for update of a`,
-    [id, clienteId],
+     where a.id = $1 and (a.cliente_id = $2::uuid or a.token_publico = $3::text) for update of a`,
+    [id, a.clienteId ?? null, a.token ?? null],
   );
   if (!ag) throw new ErroNegocio("Agendamento não encontrado", 404); // R21
   return ag;
 }
 
 /** R22 */
-export async function cancelarPeloCliente(id: string, clienteId: string) {
+export async function cancelarPeloCliente(id: string, clienteId: AcessoCliente) {
   return tx(async (t) => {
     await expirarPendentes(t);
     const ag = await carregarDoCliente(t, id, clienteId);
@@ -185,7 +220,7 @@ export async function cancelarPeloCliente(id: string, clienteId: string) {
 }
 
 /** R23 */
-export async function remarcarPeloCliente(id: string, clienteId: string, dia: string, hora: string) {
+export async function remarcarPeloCliente(id: string, clienteId: AcessoCliente, dia: string, hora: string) {
   return tx(async (t) => {
     await expirarPendentes(t);
     const ag = await carregarDoCliente(t, id, clienteId);

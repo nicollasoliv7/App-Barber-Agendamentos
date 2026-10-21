@@ -146,3 +146,37 @@ export async function diasDisponiveis(
   const limite = agora.getTime() + cfg.antecedencia_min_min * 60000;
   return dias.filter((d) => slotsDoDia(d, base, ocupados, cfg, limite).length > 0);
 }
+
+/** Profissionais ativos que fazem o serviço (e atendem na unidade, se informada). R7, R7b */
+export async function profissionaisElegiveis(
+  ex: Executor,
+  empresaId: string,
+  servicoId: string,
+  unidadeId: string | null,
+): Promise<{ id: string; nome: string }[]> {
+  return ex.query<{ id: string; nome: string }>(
+    `select p.id, p.nome from profissional p join profissional_servico ps on ps.profissional_id = p.id
+     where p.empresa_id = $1 and p.ativo and ps.servico_id = $2
+       and ($3::uuid is null or p.unidade_id is null or p.unidade_id = $3::uuid)
+     order by p.nome`,
+    [empresaId, servicoId, unidadeId],
+  );
+}
+
+/** "Sem preferência": dias em que QUALQUER profissional elegível tem horário. */
+export async function diasDisponiveisQualquer(empresaId: string, servicoId: string, unidadeId: string | null): Promise<string[]> {
+  const ex = await db();
+  const profs = await profissionaisElegiveis(ex, empresaId, servicoId, unidadeId);
+  const todos = new Set<string>();
+  for (const p of profs) for (const d of await diasDisponiveis(empresaId, servicoId, p.id)) todos.add(d);
+  return [...todos].sort();
+}
+
+/** "Sem preferência": união dos horários livres dos profissionais elegíveis. */
+export async function horariosLivresQualquer(empresaId: string, servicoId: string, dia: string, unidadeId: string | null): Promise<number[]> {
+  const ex = await db();
+  const profs = await profissionaisElegiveis(ex, empresaId, servicoId, unidadeId);
+  const todos = new Set<number>();
+  for (const p of profs) for (const m of await horariosLivres(empresaId, servicoId, p.id, dia)) todos.add(m);
+  return [...todos].sort((a, b) => a - b);
+}
