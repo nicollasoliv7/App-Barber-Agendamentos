@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Página pública: cores vêm do tema da empresa (variáveis definidas inline) */
+.tema {
+  background: var(--t-fundo);
+  color: var(--t-texto);
+}
+.tema .cartao {
+  background: color-mix(in srgb, var(--t-texto) 6%, var(--t-fundo));
+  border: 1px solid color-mix(in srgb, var(--t-texto) 14%, transparent);
+}
+.tema .btn {
+  background: var(--t-primaria);
+  color: #fff;
+}
+.tema .btn:disabled {
+  opacity: 0.5;
+}
+.tema .chip[data-ativo="true"] {
+  background: var(--t-primaria);
+  color: #fff;
+  border-color: var(--t-primaria);
+}
+.tema .suave {
+  color: color-mix(in srgb, var(--t-texto) 65%, transparent);
+}
+.tema input,
+.tema textarea,
+.tema select {
+  background: color-mix(in srgb, var(--t-texto) 8%, var(--t-fundo));
+  border: 1px solid color-mix(in srgb, var(--t-texto) 20%, transparent);
+  color: var(--t-texto);
 }
