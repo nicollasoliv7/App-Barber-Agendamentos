@@ -5,6 +5,7 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.ROTINAS_INTERNAS === "0") return;
+  if (process.env.VERCEL && process.env.ROTINAS_INTERNAS !== "1") return; // serverless: use /api/cron/*
   if (process.env.NEXT_PHASE === "phase-production-build") return;
   const g = globalThis as unknown as { __agendouRotinas?: NodeJS.Timeout };
   if (g.__agendouRotinas) return;

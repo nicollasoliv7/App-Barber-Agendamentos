@@ -133,7 +133,7 @@ export async function enviarCodigo(empresaId: string, telefoneBruto: string) {
       [empresaId, telefone, sha256(`${telefone}:${codigo}`), COD_VALIDADE_MIN],
     );
     await notificar(t, { empresaId, destino: telefone, mensagem: `Seu código de verificação é ${codigo}. Ele vale por ${COD_VALIDADE_MIN} minutos.` });
-    return { reenvioEmSegundos: COD_REENVIO_S, codigoDev: process.env.NODE_ENV !== "production" ? codigo : undefined };
+    return { reenvioEmSegundos: COD_REENVIO_S, codigoDev: process.env.NODE_ENV !== "production" || process.env.MODO_DEMO === "1" ? codigo : undefined };
   });
 }
 

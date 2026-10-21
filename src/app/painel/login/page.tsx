@@ -18,9 +18,9 @@ export default async function Page() {
         <h1 className="mt-6 text-xl font-semibold">Entrar no painel</h1>
         <p className="mb-6 text-sm muted">Agenda, clientes e faturamento da sua barbearia.</p>
         <LoginForm />
-        {process.env.NODE_ENV !== "production" && (
+        {(process.env.NODE_ENV !== "production" || process.env.MODO_DEMO === "1") && (
           <p className="mt-5 rounded-lg border border-[#ffb347]/30 bg-[#ffb347]/[0.07] p-3 text-xs text-[#ffcf8a]">
-            Ambiente de desenvolvimento — acesso de exemplo: <b className="mono">dono@agendou.dev</b> / <b className="mono">agendou123</b>
+            Demonstração com dados fictícios — acesso de exemplo: <b className="mono">dono@agendou.dev</b> / <b className="mono">agendou123</b>
           </p>
         )}
       </div>

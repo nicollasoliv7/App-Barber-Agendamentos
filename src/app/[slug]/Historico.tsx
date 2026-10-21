@@ -340,7 +340,7 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
     setReenvio(r.reenvioEmSegundos);
     setEtapa("codigo");
     setInfo(
-      `Enviamos um código de 6 dígitos para o seu WhatsApp.${r.codigoDev ? ` (Modo de desenvolvimento: o código é ${r.codigoDev})` : ""}`,
+      `Enviamos um código de 6 dígitos para o seu WhatsApp.${r.codigoDev ? ` (Modo demonstração: o código é ${r.codigoDev})` : ""}`,
     );
   }
 

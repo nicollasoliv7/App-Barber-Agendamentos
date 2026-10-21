@@ -19,7 +19,8 @@ interface Driver extends Executor {
 
 async function criarPglite(): Promise<Driver> {
   const { PGlite } = await import("@electric-sql/pglite");
-  const dir = process.env.PGLITE_DIR ?? path.join(process.cwd(), ".data", "pglite");
+  // na Vercel (serverless) só /tmp é gravável: banco de demonstração efêmero por instância
+  const dir = process.env.PGLITE_DIR ?? (process.env.VERCEL ? "/tmp/pglite" : path.join(process.cwd(), ".data", "pglite"));
   fs.mkdirSync(dir, { recursive: true });
   const pg = await PGlite.create(dir);
   return {
