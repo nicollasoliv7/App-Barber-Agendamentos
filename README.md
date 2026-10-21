@@ -27,6 +27,14 @@ O banco é criado sozinho em `.data/pglite` (Postgres embutido) com dados fictí
 | `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN` | Enviar notificações de verdade (sem isso, ficam registradas no painel) |
 | `CRON_SECRET` | Proteger `POST /api/cron/expirar` |
 | `PAGAMENTOS_SANDBOX=0` | Desliga o botão de simular pagamento |
+| `LEMBRETE_HORAS_ANTES` | Quantas horas antes enviar o lembrete (padrão 3) |
+| `ROTINAS_INTERNAS=0` | Desliga as rotinas de 1 em 1 minuto (use as rotas `/api/cron/*` em serverless) |
+
+## Verificações
+```bash
+npm run lint && npx tsc --noEmit && npm run build
+```
+O GitHub Actions (`.github/workflows/ci.yml`) roda essas três verificações a cada push.
 
 ## Documentação
-`docs/MAPA_DE_TELAS.md`, `docs/MODELO_DE_DADOS.md`, `docs/REGRAS_DE_NEGOCIO.md`, `docs/ESTRUTURA_DO_APP.md`.
+`docs/MAPA_DE_TELAS.md`, `docs/MODELO_DE_DADOS.md`, `docs/REGRAS_DE_NEGOCIO.md`, `docs/ESTRUTURA_DO_APP.md` e o diário do projeto em `docs/LOG.md`.

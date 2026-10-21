@@ -23,16 +23,17 @@ export interface CampoPub {
 
 interface Props {
   empresa: { nome: string; slug: string; endereco: string | null; maps_url: string | null; logo_url: string | null };
-  unidades: { id: string; nome: string }[];
+  unidades: { id: string; nome: string; endereco: string | null; maps_url: string | null }[];
+  pixel?: string | null;
   servicos: ServicoPub[];
   campos: CampoPub[];
   pagamento: PagamentoCfg;
 }
 
-export default function PaginaPublica({ empresa, unidades, servicos, campos, pagamento }: Props) {
+export default function PaginaPublica({ empresa, unidades, servicos, campos, pagamento, pixel }: Props) {
   const [aba, setAba] = useState<"agendar" | "historico">("agendar");
   const [servico, setServico] = useState<ServicoPub | null>(null);
-  const [aviso, setAviso] = useState(false);
+  const [aviso, setAviso] = useState<boolean | null>(null); // null = ainda não sabemos (antes de ler o navegador)
   const [unidade, setUnidade] = useState(unidades[0]?.id ?? "");
 
   useEffect(() => {
@@ -44,6 +45,20 @@ export default function PaginaPublica({ empresa, unidades, servicos, campos, pag
       setAviso(true);
     }
   }, []);
+
+  // Pixel de campanha: só carrega depois que o visitante viu e aceitou o aviso de privacidade (LGPD)
+  useEffect(() => {
+    if (aviso !== false || !pixel || !/^\d{5,20}$/.test(pixel)) return;
+    const w = window as unknown as { fbq?: unknown };
+    if (w.fbq) return;
+    const sc = document.createElement("script");
+    sc.text = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixel}');fbq('track','PageView');`;
+    document.head.appendChild(sc);
+  }, [aviso, pixel]);
+
+  const unidadeAtual = unidades.find((u) => u.id === unidade);
+  const endereco = unidadeAtual?.endereco ?? empresa.endereco;
+  const mapsUrl = unidadeAtual?.maps_url ?? empresa.maps_url;
 
   const iniciais = empresa.nome
     .split(" ")
@@ -61,27 +76,33 @@ export default function PaginaPublica({ empresa, unidades, servicos, campos, pag
           <div className="h-24 w-24 rounded-full grid place-items-center text-3xl font-bold btn">{iniciais}</div>
         )}
         <h1 className="text-xl font-bold">{empresa.nome}</h1>
-        {empresa.endereco && (
-          <p className="text-sm suave">
-            {empresa.endereco}
-            {empresa.maps_url && (
-              <>
-                {" · "}
-                <a href={empresa.maps_url} target="_blank" rel="noreferrer" className="underline">
-                  Ver no mapa
-                </a>
-              </>
-            )}
-          </p>
-        )}
         {unidades.length > 1 && (
-          <select value={unidade} onChange={(e) => setUnidade(e.target.value)} className="rounded-lg px-3 py-2 text-sm">
+          <select
+            value={unidade}
+            onChange={(e) => setUnidade(e.target.value)}
+            className="rounded-lg px-3 py-2 text-sm"
+            aria-label="Unidade"
+          >
             {unidades.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.nome}
               </option>
             ))}
           </select>
+        )}
+        {unidades.length === 1 && <p className="text-sm font-medium">{unidades[0].nome}</p>}
+        {endereco && (
+          <p className="text-sm suave">
+            {endereco}
+            {mapsUrl && (
+              <>
+                {" · "}
+                <a href={mapsUrl} target="_blank" rel="noreferrer" className="underline">
+                  Ver no mapa
+                </a>
+              </>
+            )}
+          </p>
         )}
       </header>
 
@@ -124,6 +145,7 @@ export default function PaginaPublica({ empresa, unidades, servicos, campos, pag
       {servico && (
         <Agendar
           slug={empresa.slug}
+          unidade={unidade || undefined}
           servico={servico}
           campos={campos}
           pagamento={pagamento}

@@ -76,7 +76,7 @@ Passos em sequência, cada um carregado por um endpoint de leitura:
 | B11 | Configurações da empresa | Nome, slug, endereço + link do Maps, WhatsApp, logo, **cores do tema**, campos personalizados, pixel de campanha |
 | B12 | Regras de agendamento | Antecedência mínima, janela máxima, intervalo entre horários, política de cancelamento/remarcação |
 | B13 | Pagamentos | Modalidade (desativado/opcional/obrigatório), sinal (%) ou integral, prazo do Pix |
-| B14 | Notificações | Mensagens de confirmação e lembrete via WhatsApp |
+| B14 | Notificações | Mensagens de confirmação e lembrete via WhatsApp (log de envios) |
 | B15 | Unidades | Multi-unidade: cadastro de unidades e vínculo de profissionais |
 | B16 | Plano / assinatura | Plano atual da plataforma, faturas (fora do MVP) |
 

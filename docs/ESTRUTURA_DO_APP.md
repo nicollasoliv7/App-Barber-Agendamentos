@@ -33,8 +33,10 @@ agendou/
 │  │  ├─ agendamentos.ts    # criar / cancelar / remarcar / status (R9–R14, R21–R26)
 │  │  ├─ pagamentos.ts      # Pix e cartão sandbox (R15–R20)
 │  │  ├─ notificacoes.ts    # fila e envio
+│  │  ├─ lembretes.ts       # lembrete antes do horário (R14b)
 │  │  ├─ sessao.ts          # login painel/cliente, código de verificação (R30–R32)
 │  │  └─ api.ts             # helpers dos route handlers
+│  ├─ instrumentation.ts    # rotinas a cada minuto (expiração do Pix, lembretes)
 │  └─ app/
 │     ├─ page.tsx                    # início: lista empresas + link do painel
 │     ├─ [slug]/                     # PÁGINA PÚBLICA por empresa
@@ -72,7 +74,7 @@ agendou/
 | `/painel/bloqueios` | dono | B7 |
 | `/painel/financeiro` | dono | B8, B9, B10 |
 | `/painel/notificacoes` | dono | B14 |
-| `/painel/configuracoes` | dono | B11, B12, B13 (+ campos personalizados, multiunidade) |
+| `/painel/configuracoes` | dono | B11, B12, B13, B15 (+ campos personalizados, cadastro de unidades) |
 
 ## 4. Endpoints (route handlers)
 
@@ -80,7 +82,7 @@ agendou/
 | Método | Caminho | Faz |
 |---|---|---|
 | GET | `/` | empresa, tema, regras de pagamento, serviços, campos |
-| GET | `/profissionais?servico=` | R7 |
+| GET | `/profissionais?servico=[&unidade=]` | R7, R7b |
 | GET | `/dias?servico=&profissional=` | R5, R6 |
 | GET | `/horarios?servico=&profissional=&dia=` | R1–R4 |
 | POST | `/agendamentos` | cria (R9–R14) e devolve o `token` do agendamento |
@@ -106,9 +108,9 @@ agendou/
 | POST | `/{id}/cancelar` | cancela a cobrança e, se o pagamento era obrigatório, o agendamento |
 | POST | `/cartao` | paga com cartão salvo (o final 0002 é recusado) |
 
-**Sistema**: `POST /api/cron/expirar` (R18; protegido por `CRON_SECRET` quando definido).
+**Sistema**: `POST /api/cron/expirar` (R18) e `POST /api/cron/lembretes` (R14b), ambos protegidos por `CRON_SECRET` quando ele está definido. Localmente, `src/instrumentation.ts` executa as duas rotinas a cada minuto (para desligar, `ROTINAS_INTERNAS=0`).
 
-**Painel**: server actions em `src/app/painel/acoes.ts`: entrar/sair, novoAgendamentoManual, mudarStatus, registrarPagamentoLocal, salvarServico, salvarProfissional, adicionarFaixa/removerFaixa, adicionarBloqueio/removerBloqueio, salvarEmpresa, salvarTema, salvarRegras, salvarCampo, salvarCliente.
+**Painel**: server actions em `src/app/painel/acoes.ts`: entrar/sair, novoAgendamentoManual, mudarStatus, registrarPagamentoLocal, salvarServico, salvarProfissional, adicionarFaixa/removerFaixa, adicionarBloqueio/removerBloqueio, salvarEmpresa, salvarTema, salvarRegras, salvarCampo, salvarCliente, salvarUnidade, estornarPagamentos.
 
 ## 5. Schema SQL
 Ver `db/schema.sql` (16 tabelas, descritas em MODELO_DE_DADOS.md).
@@ -133,7 +135,8 @@ Ver `db/schema.sql` (16 tabelas, descritas em MODELO_DE_DADOS.md).
 4. **Página pública**: vitrine e assistente de agendamento ✅
 5. **Histórico**: listar, remarcar, cancelar ✅
 6. **Pagamentos (sandbox)**: Pix com expiração e cartão tokenizado ✅
-7. **Notificações**: fila, log no painel e envio plugável ✅
+7. **Notificações**: fila, log no painel, envio plugável e lembretes automáticos ✅
+8. **Complementos**: multi-unidade, estorno sandbox, pixel com consentimento, menu do painel no celular ✅
 
 ## 8. Como rodar
 ```

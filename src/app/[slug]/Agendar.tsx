@@ -9,6 +9,7 @@ import Modal from "./Modal";
 
 interface Props {
   slug: string;
+  unidade?: string;
   servico: ServicoPub;
   campos: CampoPub[];
   pagamento: PagamentoCfg;
@@ -18,7 +19,7 @@ interface Props {
 
 type Criado = { id: string; status: string; inicio: string; preco_centavos: number; token: string };
 
-export default function Agendar({ slug, servico, campos, pagamento, onFechar, onVerHistorico }: Props) {
+export default function Agendar({ slug, unidade, servico, campos, pagamento, onFechar, onVerHistorico }: Props) {
   const [profissionais, setProfissionais] = useState<{ id: string; nome: string }[] | null>(null);
   const [prof, setProf] = useState<{ id: string; nome: string } | null>(null);
   const [dias, setDias] = useState<string[] | null>(null);
@@ -50,13 +51,13 @@ export default function Agendar({ slug, servico, campos, pagamento, onFechar, on
   }
 
   useEffect(() => {
-    api<{ profissionais: { id: string; nome: string }[] }>(`${base}/profissionais?servico=${servico.id}`)
+    api<{ profissionais: { id: string; nome: string }[] }>(`${base}/profissionais?servico=${servico.id}${unidade ? `&unidade=${unidade}` : ""}`)
       .then((r) => {
         setProfissionais(r.profissionais);
         if (r.profissionais.length === 1) escolherProf(r.profissionais[0]);
       })
       .catch((e) => setErro(e.message));
-  }, [base, servico.id]);
+  }, [base, servico.id, unidade]);
 
   useEffect(() => {
     if (!prof) return;

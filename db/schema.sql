@@ -212,3 +212,6 @@ create table if not exists notificacao (
   criado_em timestamptz not null default now(),
   enviado_em timestamptz
 );
+
+-- v2: lembretes automáticos
+alter table agendamento add column if not exists lembrete_enviado_em timestamptz;

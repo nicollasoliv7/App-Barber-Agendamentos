@@ -5,7 +5,7 @@ import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
 import { diaLocal, formatarDia, instanteLocal, minutosLocal, hhmm, reais, somarDias } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
-import { mudarStatus, novoAgendamentoManual, registrarPagamentoLocal } from "../acoes";
+import { estornarPagamentos, mudarStatus, novoAgendamentoManual, registrarPagamentoLocal } from "../acoes";
 import { Campo, Form, inp } from "../Form";
 
 export const metadata = { title: "Agenda" };
@@ -140,6 +140,12 @@ export default async function Agenda({ searchParams }: PageProps<"/painel">) {
                       </div>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${COR[a.status]}`}>{ROT[a.status]}</span>
                     </div>
+                    {a.status === "cancelado" && a.pago > 0 && (
+                      <form action={estornarPagamentos} className="mt-2">
+                        <input type="hidden" name="id" value={a.id} />
+                        <button className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">Estornar pagamento (teste)</button>
+                      </form>
+                    )}
                     {a.status !== "cancelado" && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {(["concluido", "faltou", "cancelado"] as const)

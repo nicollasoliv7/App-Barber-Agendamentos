@@ -20,7 +20,7 @@ export default async function Page({ params }: PageProps<"/[slug]">) {
     configAgendamento(e.id),
     servicosAtivos(e.id),
     camposAtivos(e.id),
-    q<{ id: string; nome: string }>(`select id, nome from unidade where empresa_id = $1 and ativo order by nome`, [e.id]),
+    q<{ id: string; nome: string; endereco: string | null; maps_url: string | null }>(`select id, nome, endereco, maps_url from unidade where empresa_id = $1 and ativo order by nome`, [e.id]),
   ]);
   const estilo = {
     "--t-primaria": tema.cor_primaria,
@@ -34,6 +34,7 @@ export default async function Page({ params }: PageProps<"/[slug]">) {
       <PaginaPublica
         empresa={{ nome: e.nome, slug: e.slug, endereco: e.endereco, maps_url: e.maps_url, logo_url: e.logo_url }}
         unidades={e.multiunidade ? unidades : []}
+        pixel={e.pixel_campanha}
         servicos={servicos.map((s) => ({
           id: s.id,
           nome: s.nome,

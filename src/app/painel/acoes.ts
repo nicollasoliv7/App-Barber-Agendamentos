@@ -152,18 +152,17 @@ export async function salvarProfissional(_: Estado, f: FormData): Promise<Estado
     await tx(async (t) => {
       let pid = id;
       if (isUuid(id)) {
-        await t.query(`update profissional set nome=$1, telefone=$2, comissao_pct=$3, ativo=$4 where id=$5 and empresa_id=$6`, [
-          nome,
-          txt(f, "telefone") || null,
-          com,
-          f.get("ativo") === "on",
-          id,
-          u.empresa_id,
-        ]);
+        await t.query(
+          `update profissional set nome=$1, telefone=$2, comissao_pct=$3, ativo=$4,
+             unidade_id = (select id from unidade where id = nullif($7,'')::uuid and empresa_id = $6)
+           where id=$5 and empresa_id=$6`,
+          [nome, txt(f, "telefone") || null, com, f.get("ativo") === "on", id, u.empresa_id, isUuid(txt(f, "unidade")) ? txt(f, "unidade") : ""],
+        );
       } else {
         const [p] = await t.query<{ id: string }>(
-          `insert into profissional (empresa_id, nome, telefone, comissao_pct, ativo) values ($1,$2,$3,$4,true) returning id`,
-          [u.empresa_id, nome, txt(f, "telefone") || null, com],
+          `insert into profissional (empresa_id, nome, telefone, comissao_pct, ativo, unidade_id)
+           values ($1,$2,$3,$4,true,(select id from unidade where id = nullif($5,'')::uuid and empresa_id = $1)) returning id`,
+          [u.empresa_id, nome, txt(f, "telefone") || null, com, isUuid(txt(f, "unidade")) ? txt(f, "unidade") : ""],
         );
         pid = p.id;
         // expediente padrão: seg–sex 09–18, sáb 09–14
@@ -353,4 +352,44 @@ export async function salvarCliente(_: Estado, f: FormData): Promise<Estado> {
     await q(`update cliente set nome=$1, email=$2 where id=$3 and empresa_id=$4`, [txt(f, "nome"), txt(f, "email") || null, txt(f, "id"), u.empresa_id]);
     return "Cliente salvo";
   });
+}
+
+// ---------- Unidades (multi-unidade) ----------
+
+export async function salvarUnidade(_: Estado, f: FormData): Promise<Estado> {
+  const u = await exigirUsuario();
+  return executar(async () => {
+    const id = txt(f, "id");
+    const nome = txt(f, "nome");
+    if (!nome) throw new ErroNegocio("Informe o nome da unidade");
+    const vals = [nome, txt(f, "endereco") || null, txt(f, "maps_url") || null];
+    if (isUuid(id)) {
+      await q(`update unidade set nome=$1, endereco=$2, maps_url=$3, ativo=$4 where id=$5 and empresa_id=$6`, [
+        ...vals,
+        f.get("ativo") === "on",
+        id,
+        u.empresa_id,
+      ]);
+    } else {
+      await q(`insert into unidade (nome, endereco, maps_url, empresa_id) values ($1,$2,$3,$4)`, [...vals, u.empresa_id]);
+    }
+    return "Unidade salva";
+  });
+}
+
+// ---------- Estorno (sandbox) ----------
+
+/** Estorna pagamentos aprovados de um agendamento cancelado (R24). No sandbox apenas marca como estornado. */
+export async function estornarPagamentos(f: FormData) {
+  const u = await exigirUsuario();
+  const id = txt(f, "id");
+  if (!isUuid(id)) return;
+  await q(
+    `update pagamento p set status = 'estornado'
+     from agendamento a
+     where p.agendamento_id = a.id and a.id = $1 and a.empresa_id = $2 and a.status = 'cancelado'
+       and p.status = 'pago' and p.metodo in ('pix','cartao')`,
+    [id, u.empresa_id],
+  );
+  revalidatePath("/painel", "layout");
 }

@@ -2,18 +2,22 @@ import { q, q1 } from "@/lib/db";
 import { usuarioPainel } from "@/lib/sessao";
 import { configAgendamento, configTema } from "@/lib/empresa";
 import type { CampoPersonalizado, Empresa } from "@/lib/tipos";
-import { salvarCampo, salvarEmpresa, salvarRegras, salvarTema } from "../../acoes";
+import { salvarCampo, salvarEmpresa, salvarRegras, salvarTema, salvarUnidade } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
 
 export const metadata = { title: "Configurações" };
 
 export default async function Page() {
   const u = (await usuarioPainel())!;
-  const [e, tema, cfg, campos] = await Promise.all([
+  const [e, tema, cfg, campos, unidades] = await Promise.all([
     q1<Empresa>(`select * from empresa where id = $1`, [u.empresa_id]),
     configTema(u.empresa_id),
     configAgendamento(u.empresa_id),
     q<CampoPersonalizado>(`select * from campo_personalizado where empresa_id = $1 order by ordem`, [u.empresa_id]),
+    q<{ id: string; nome: string; endereco: string | null; maps_url: string | null; ativo: boolean }>(
+      `select id, nome, endereco, maps_url, ativo from unidade where empresa_id = $1 order by nome`,
+      [u.empresa_id],
+    ),
   ]);
   const card = "rounded-2xl bg-white p-4 shadow-sm";
 
@@ -50,6 +54,45 @@ export default async function Page() {
           </label>
         </Form>
       </section>
+
+      {e!.multiunidade && (
+        <section className={card}>
+          <h2 className="mb-1 font-semibold">Unidades</h2>
+          <p className="mb-3 text-xs text-slate-500">
+            O cliente escolhe a unidade na página pública e só vê os profissionais dela (ou os marcados para todas as unidades).
+          </p>
+          <div className="grid gap-2">
+            {unidades.map((un) => (
+              <Form key={un.id} action={salvarUnidade} className="grid gap-2 border-b pb-3 md:grid-cols-4 md:items-end">
+                <input type="hidden" name="id" value={un.id} />
+                <Campo rotulo="Nome">
+                  <input name="nome" required defaultValue={un.nome} className={inp} />
+                </Campo>
+                <Campo rotulo="Endereço">
+                  <input name="endereco" defaultValue={un.endereco ?? ""} className={inp} />
+                </Campo>
+                <Campo rotulo="Link do Maps">
+                  <input name="maps_url" type="url" defaultValue={un.maps_url ?? ""} className={inp} />
+                </Campo>
+                <label className="flex items-center gap-2 text-sm pb-2">
+                  <input type="checkbox" name="ativo" defaultChecked={un.ativo} /> Ativa
+                </label>
+              </Form>
+            ))}
+            <Form action={salvarUnidade} className="grid gap-2 pt-2 md:grid-cols-3 md:items-end" botao="Adicionar unidade" resetar>
+              <Campo rotulo="Nova unidade">
+                <input name="nome" placeholder="ex.: Unidade Centro" className={inp} />
+              </Campo>
+              <Campo rotulo="Endereço">
+                <input name="endereco" className={inp} />
+              </Campo>
+              <Campo rotulo="Link do Maps">
+                <input name="maps_url" type="url" className={inp} />
+              </Campo>
+            </Form>
+          </div>
+        </section>
+      )}
 
       <section className={card}>
         <h2 className="mb-3 font-semibold">Cores da página pública</h2>
