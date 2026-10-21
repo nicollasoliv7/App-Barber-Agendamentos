@@ -46,7 +46,8 @@ export async function encerrarSessao(tipo: "painel" | "cliente") {
 export interface UsuarioPainel {
   id: string;
   nome: string;
-  email: string;
+  telefone: string | null;
+  email: string | null;
   papel: string;
   empresa_id: string;
   empresa_nome: string;
@@ -58,19 +59,21 @@ export async function usuarioPainel(): Promise<UsuarioPainel | null> {
   if (!s?.usuario_id) return null;
   return (
     (await q1<UsuarioPainel>(
-      `select u.id, u.nome, u.email, u.papel, u.empresa_id, e.nome as empresa_nome, e.slug as empresa_slug
+      `select u.id, u.nome, u.telefone, u.email, u.papel, u.empresa_id, e.nome as empresa_nome, e.slug as empresa_slug
        from usuario_painel u join empresa e on e.id = u.empresa_id where u.id = $1 and u.ativo`,
       [s.usuario_id],
     )) ?? null
   );
 }
 
-export async function loginPainel(email: string, senha: string) {
+export async function loginPainel(telefoneDigitado: string, senha: string) {
+  const telefone = normalizarTelefone(telefoneDigitado);
+  if (!telefone) throw new ErroNegocio("Informe o celular com DDD", 400);
   const u = await q1<{ id: string; senha_hash: string }>(
-    `select id, senha_hash from usuario_painel where lower(email) = lower($1) and ativo`,
-    [email.trim()],
+    `select id, senha_hash from usuario_painel where telefone = $1 and ativo`,
+    [telefone],
   );
-  if (!u || !conferirSenha(senha, u.senha_hash)) throw new ErroNegocio("E-mail ou senha incorretos", 401);
+  if (!u || !conferirSenha(senha, u.senha_hash)) throw new ErroNegocio("Telefone ou senha incorretos", 401);
   await criarSessao("painel", u.id);
 }
 

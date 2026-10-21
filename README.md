@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 - Página pública: http://localhost:3000/barbearia-exemplo
-- Painel: http://localhost:3000/painel — `dono@agendou.dev` / `agendou123` (acesso fictício, só no desenvolvimento)
+- Painel: http://localhost:3000/painel — celular `(11) 90000-0001` / senha `agendou123` (acesso fictício, só no desenvolvimento)
 - O banco de exemplo vem com **45 dias de histórico fictício** para o dashboard não abrir vazio.
 
 O banco é criado sozinho em `.data/pglite` (Postgres embutido) com dados fictícios. Para zerar, apague a pasta `.data`.

@@ -41,7 +41,7 @@ async function executar(fn: () => Promise<string | void>, caminho = "/painel"): 
 
 export async function entrar(_: Estado, f: FormData): Promise<Estado> {
   try {
-    await loginPainel(txt(f, "email"), String(f.get("senha") ?? ""));
+    await loginPainel(txt(f, "telefone"), String(f.get("senha") ?? ""));
   } catch (e) {
     return { erro: e instanceof ErroNegocio ? e.message : "Falha ao entrar" };
   }

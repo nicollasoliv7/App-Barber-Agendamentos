@@ -111,12 +111,18 @@ create table if not exists usuario_painel (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid not null references empresa(id) on delete cascade,
   nome text not null,
-  email text not null unique,
+  telefone text unique, -- login do painel (só dígitos, com DDD)
+  email text unique,
   senha_hash text not null,
   papel text not null default 'dono' check (papel in ('dono','admin','profissional')),
   profissional_id uuid references profissional(id) on delete set null,
   ativo boolean not null default true
 );
+-- bancos criados antes do login por telefone
+alter table usuario_painel add column if not exists telefone text;
+alter table usuario_painel alter column email drop not null;
+create unique index if not exists usuario_painel_telefone_key on usuario_painel (telefone);
+update usuario_painel set telefone = '11900000001' where email = 'dono@agendou.dev' and telefone is null; -- acesso fictício de exemplo
 
 create table if not exists cliente (
   id uuid primary key default gen_random_uuid(),

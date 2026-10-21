@@ -53,7 +53,7 @@ const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } });
 const p = await ctx.newPage();
 ver(p, "painel");
 await p.goto(`${URL}/painel/login`);
-await p.fill("input[name=email]", "dono@agendou.dev");
+await p.fill("input[name=telefone]", "11900000001");
 await p.fill("input[name=senha]", "agendou123");
 await p.click("button:has-text('Entrar')");
 await p.waitForURL(/\/painel$/);

@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+const URL = process.argv[2];
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+const p = await b.newPage();
+await p.goto(`${URL}/painel/login`);
+console.log("dica:", (await p.locator("p.mt-5").innerText().catch(() => "—")));
+await p.fill("input[name=telefone]", "11900000002"); await p.fill("input[name=senha]", "agendou123");
+await p.click("button:has-text('Entrar')"); await p.getByRole("alert").waitFor();
+console.log("errado:", await p.getByRole("alert").innerText(), "| campo:", await p.inputValue("input[name=telefone]"));
+await p.fill("input[name=telefone]", ""); await p.type("input[name=telefone]", "11900000001");
+console.log("máscara:", await p.inputValue("input[name=telefone]"));
+await p.fill("input[name=senha]", "agendou123");
+await p.click("button:has-text('Entrar')"); await p.waitForURL(/\/painel$/);
+console.log("ok:", await p.getByRole("heading", { name: /Olá/ }).innerText());
+await p.screenshot({ path: "/tmp/claude-0/login.png" });
+await b.close();

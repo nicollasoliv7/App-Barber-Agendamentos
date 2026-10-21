@@ -20,7 +20,7 @@ export default async function Page() {
         <LoginForm />
         {(process.env.NODE_ENV !== "production" || process.env.MODO_DEMO === "1") && (
           <p className="mt-5 rounded-lg border border-[#ffb347]/30 bg-[#ffb347]/[0.07] p-3 text-xs text-[#ffcf8a]">
-            Demonstração com dados fictícios — acesso de exemplo: <b className="mono">dono@agendou.dev</b> / <b className="mono">agendou123</b>
+            Demonstração com dados fictícios — acesso de exemplo: <b className="mono">(11) 90000-0001</b> / <b className="mono">agendou123</b>
           </p>
         )}
       </div>

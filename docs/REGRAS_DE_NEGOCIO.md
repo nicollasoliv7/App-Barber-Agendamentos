@@ -48,6 +48,7 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
 ## 6. Identificação e segurança
 - **R30** — Login do cliente por telefone + senha. No primeiro acesso, o cadastro da senha exige o código de 6 dígitos enviado por WhatsApp/SMS, com validade de 10 min, até 5 tentativas e reenvio após 60 s. No modo de desenvolvimento, o código aparece no console e no log de notificações.
 - **R31** — No MVP, o agendamento pela página pública **não exige** senha: basta nome + telefone, como na referência. A senha é exigida para ver o histórico.
+- **R32a · Login do painel** — O dono e a equipe entram no painel com **celular (com DDD) + senha**. O telefone é guardado só com dígitos e é único entre os usuários do painel. O e-mail passa a ser opcional.
 - **R32** — Senhas são guardadas com hash (scrypt), e as sessões em cookie httpOnly com validade de 30 dias.
 - **R33** — Os dados de exemplo são fictícios. Nenhum dado real da referência é usado.
 - **R34 · Pixel (LGPD)** — O pixel de campanha configurado pela empresa só é carregado depois que o visitante vê e aceita o aviso de privacidade.

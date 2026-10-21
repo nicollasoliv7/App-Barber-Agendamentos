@@ -4,7 +4,7 @@ const shots = process.env.SHOTS_DIR ?? "e2e/capturas";
 const b = await chromium.launch();
 const erros = [];
 const pp = await (await b.newContext()).newPage();
-await pp.goto(`${URL}/painel/login`); await pp.fill("input[name=email]", "dono@agendou.dev"); await pp.fill("input[name=senha]", "agendou123");
+await pp.goto(`${URL}/painel/login`); await pp.fill("input[name=telefone]", "11900000001"); await pp.fill("input[name=senha]", "agendou123");
 await pp.click("button:has-text('Entrar')"); await pp.waitForURL(/\/painel$/);
 async function modo(m) {
   await pp.goto(`${URL}/painel/configuracoes`);

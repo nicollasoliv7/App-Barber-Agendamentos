@@ -1,15 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { mascaraTelefone } from "../../[slug]/cliente-api";
 import { entrar } from "../acoes";
 
 export default function LoginForm() {
   const [estado, acao, pendente] = useActionState(entrar, undefined);
+  const [telefone, setTelefone] = useState("");
   return (
     <form action={acao} className="grid gap-3" aria-busy={pendente}>
       <label className="grid gap-1.5">
-        <span className="rotulo">E-mail</span>
-        <input name="email" type="email" required autoComplete="username" />
+        <span className="rotulo">Celular (WhatsApp)</span>
+        <input
+          name="telefone"
+          type="tel"
+          inputMode="numeric"
+          required
+          autoComplete="username"
+          placeholder="(11) 90000-0000"
+          value={telefone}
+          onChange={(e) => setTelefone(mascaraTelefone(e.target.value))}
+        />
       </label>
       <label className="grid gap-1.5">
         <span className="rotulo">Senha</span>

@@ -53,7 +53,7 @@ erDiagram
 id, empresa_id FK, nome, endereco, maps_url, ativo.
 
 ### usuario_painel (dono / administrador)
-id, empresa_id FK, nome, email UNIQUE, senha_hash, papel (`dono` \| `admin` \| `profissional`), profissional_id FK null, ativo.
+id, empresa_id FK, nome, telefone UNIQUE (login do painel, só dígitos), email UNIQUE null, senha_hash, papel (`dono` \| `admin` \| `profissional`), profissional_id FK null, ativo.
 
 ### config_tema (1:1 empresa)
 empresa_id PK/FK, cor_primaria, cor_secundaria, cor_fundo, cor_texto, modo (`claro` \| `escuro`).

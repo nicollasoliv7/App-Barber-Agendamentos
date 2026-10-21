@@ -3,7 +3,7 @@ import { diaLocal, diaSemana, instanteLocal, somarDias } from "./tempo";
 import { hashSenha } from "./senha";
 
 /** Dados 100% fictícios para desenvolvimento. */
-export const SEED_LOGIN = { email: "dono@agendou.dev", senha: "agendou123" };
+export const SEED_LOGIN = { telefone: "11900000001", email: "dono@agendou.dev", senha: "agendou123" };
 
 export async function semear(t: Executor) {
   const [emp] = await t.query<{ id: string }>(
@@ -71,8 +71,8 @@ export async function semear(t: Executor) {
   }
 
   await t.query(
-    `insert into usuario_painel (empresa_id, nome, email, senha_hash, papel) values ($1,'Dono Exemplo',$2,$3,'dono')`,
-    [e, SEED_LOGIN.email, hashSenha(SEED_LOGIN.senha)],
+    `insert into usuario_painel (empresa_id, nome, telefone, email, senha_hash, papel) values ($1,'Dono Exemplo',$2,$3,$4,'dono')`,
+    [e, SEED_LOGIN.telefone, SEED_LOGIN.email, hashSenha(SEED_LOGIN.senha)],
   );
 
   await historicoFicticio(t, e, ids, profIds);

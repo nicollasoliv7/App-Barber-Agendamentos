@@ -186,5 +186,5 @@ Onboarding pela API do Supabase: `select public.criar_empresa('Nome', 'slug')` c
 npm install
 npm run dev          # http://localhost:3000
 ```
-Painel: `/painel` → `dono@agendou.dev` / `agendou123` (só no desenvolvimento). Página pública: `/barbearia-exemplo`.
+Painel: `/painel` → celular `(11) 90000-0001` / senha `agendou123` (só no desenvolvimento). Página pública: `/barbearia-exemplo`.
 Para usar o Supabase, rode a migration `supabase/migrations/20261021150000_agendou_schema.sql` no SQL Editor e defina `DATABASE_URL` (string de conexão do Postgres).
