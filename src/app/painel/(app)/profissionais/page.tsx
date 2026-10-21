@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import type { Profissional } from "@/lib/tipos";
 import { salvarProfissional } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
@@ -7,7 +7,7 @@ import { Campo, Form, inp } from "../../Form";
 export const metadata = { title: "Profissionais" };
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const [profs, servicos, vinc, unidades] = await Promise.all([
     q<Profissional>(`select * from profissional where empresa_id = $1 order by ativo desc, nome`, [u.empresa_id]),
     q<{ id: string; nome: string }>(`select id, nome from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]),

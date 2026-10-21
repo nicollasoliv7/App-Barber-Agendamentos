@@ -18,8 +18,10 @@ Não há ORM: o SQL é escrito à mão por uma camada fina (`src/lib/db.ts`) que
 ```
 agendou/
 ├─ db/
-│  ├─ schema.sql            # schema completo (aplicado ao subir; idempotente)
-│  └─ supabase_extra.sql    # EXCLUDE anti-conflito (btree_gist), só no Postgres completo
+│  └─ schema.sql            # schema mínimo usado pelo banco embutido (PGlite), aplicado ao subir
+├─ supabase/
+│  └─ migrations/
+│     └─ 20261021150000_agendou_schema.sql  # schema COMPLETO para Supabase: tabelas, FKs, índices, travas e RLS
 ├─ src/
 │  ├─ lib/                  # regras de negócio (server-only)
 │  │  ├─ db.ts              # PGlite | Postgres, transações, seed automático
@@ -113,7 +115,24 @@ agendou/
 **Painel**: server actions em `src/app/painel/acoes.ts`: entrar/sair, novoAgendamentoManual, mudarStatus, registrarPagamentoLocal, salvarServico, salvarProfissional, adicionarFaixa/removerFaixa, adicionarBloqueio/removerBloqueio, salvarEmpresa, salvarTema, salvarRegras, salvarCampo, salvarCliente, salvarUnidade, estornarPagamentos.
 
 ## 5. Schema SQL
-Ver `db/schema.sql` (16 tabelas, descritas em MODELO_DE_DADOS.md).
+- **Supabase/produção**: `supabase/migrations/20261021150000_agendou_schema.sql`, a fonte oficial. Contém:
+  - 18 tabelas e as chaves estrangeiras **compostas** `(id, empresa_id)`, que impedem misturar dados de empresas diferentes (por exemplo, um agendamento da empresa A com um cliente da B);
+  - restrição `EXCLUDE` contra sobreposição de horários (R10);
+  - CHECKs das regras (formatos, prazos, status coerente com `cancelado_por`, Pix pendente com prazo);
+  - triggers de integridade e índices de todas as consultas;
+  - **RLS** em todas as tabelas, com 51 políticas.
+- **Local**: `db/schema.sql`, versão compatível com o PGlite (sem RLS e sem `auth`). O app funciona com qualquer um dos dois.
+
+### Segurança (RLS)
+| Quem | Acesso |
+|---|---|
+| `anon` (sem login) | Nada. Página pública e cliente final passam pelas rotas `/api/*` do servidor |
+| `authenticated` dono/admin | Lê e escreve só nas linhas da própria empresa (`usuario_painel.auth_user_id = auth.uid()`) |
+| `authenticated` profissional | Lê a própria empresa; altera só os próprios agendamentos |
+| Colunas sensíveis | `senha_hash`, `token_publico`, `cartao.token_provedor`, `sessao`, `codigo_verificacao`: ninguém lê pela API do Supabase |
+| Servidor do app (`DATABASE_URL` / service_role) | Acesso total (ignora a RLS), com o isolamento feito no código por `empresa_id` |
+
+Onboarding pela API do Supabase: `select public.criar_empresa('Nome', 'slug')` cria a empresa, as configurações padrão e o vínculo de dono do usuário logado.
 
 ## 6. Componentes
 
@@ -144,4 +163,4 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 Painel: `/painel` → `dono@agendou.dev` / `agendou123` (só no desenvolvimento). Página pública: `/barbearia-exemplo`.
-Para usar o Supabase, defina `DATABASE_URL` (string de conexão do Postgres) e, opcionalmente, rode `db/supabase_extra.sql`.
+Para usar o Supabase, rode a migration `supabase/migrations/20261021150000_agendou_schema.sql` no SQL Editor e defina `DATABASE_URL` (string de conexão do Postgres).

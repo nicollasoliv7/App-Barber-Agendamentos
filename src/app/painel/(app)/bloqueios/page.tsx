@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora } from "@/lib/tempo";
 import { adicionarBloqueio, removerBloqueio } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
@@ -7,7 +7,7 @@ import { Campo, Form, inp } from "../../Form";
 export const metadata = { title: "Folgas e bloqueios" };
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const profs = await q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 order by nome`, [u.empresa_id]);
   const bls = await q<{ id: string; inicio: Date; fim: Date; motivo: string | null; profissional: string | null }>(
     `select b.id, b.inicio, b.fim, b.motivo, p.nome as profissional from bloqueio b left join profissional p on p.id = b.profissional_id

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
 import { diaLocal, formatarDia, instanteLocal, minutosLocal, hhmm, reais, somarDias } from "@/lib/tempo";
@@ -41,7 +41,7 @@ type Linha = {
 };
 
 export default async function Agenda({ searchParams }: PageProps<"/painel">) {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   await expirarPendentes();
   const cfg = await configAgendamento(u.empresa_id);
   const sp = await searchParams;

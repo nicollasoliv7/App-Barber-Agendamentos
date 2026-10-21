@@ -81,3 +81,19 @@ Teste final no seu PC: o cliente fictício "Paulo Teste Windows" agendou Barba �
 
 **Próximo passo exato**
 - Login no painel de referência → completar o mapeamento B1–B16 → comparar com o app.
+
+---
+
+## 2026-10-21 — Migration do Supabase (SQL completo + RLS)
+
+**Feito**
+- `supabase/migrations/20261021150000_agendou_schema.sql`, o schema oficial para Supabase:
+  - 18 tabelas com FKs compostas por empresa, `EXCLUDE` contra horários sobrepostos, CHECKs das regras de negócio, triggers de integridade e índices;
+  - RLS em todas as tabelas (51 políticas), sem acesso do `anon` e com colunas sensíveis ocultas;
+  - função `criar_empresa()` para o onboarding.
+- Testada num Postgres 16 simulando o Supabase (papéis anon/authenticated, `auth.uid()`). 22 testes passaram: isolamento A×B, papel profissional, colunas ocultas, conflito de horário, FK entre empresas, onboarding. Também roda de novo sem erro e convive com `db/schema.sql`.
+- App rodado em cima desse banco (via `DATABASE_URL`): fluxo público, histórico, unidades, estorno e painel aprovados.
+- Bug corrigido: as páginas do painel acessadas sem login geravam erro no servidor (layout e página renderizam em paralelo). Agora cada página redireciona por conta própria (`usuarioOuLogin`).
+- `db/supabase_extra.sql` foi removido, porque a migration nova já o inclui.
+
+**Pendências**: as mesmas da entrada anterior. A migration substitui o passo "rodar `db/supabase_extra.sql`".

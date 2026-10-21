@@ -1,5 +1,5 @@
 import { q, q1 } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento, configTema } from "@/lib/empresa";
 import type { CampoPersonalizado, Empresa } from "@/lib/tipos";
 import { salvarCampo, salvarEmpresa, salvarRegras, salvarTema, salvarUnidade } from "../../acoes";
@@ -8,7 +8,7 @@ import { Campo, Form, inp } from "../../Form";
 export const metadata = { title: "Configurações" };
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const [e, tema, cfg, campos, unidades] = await Promise.all([
     q1<Empresa>(`select * from empresa where id = $1`, [u.empresa_id]),
     configTema(u.empresa_id),

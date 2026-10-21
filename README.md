@@ -20,10 +20,20 @@ O banco é criado sozinho em `.data/pglite` (Postgres embutido) com dados fictí
 - Cartão (cliente logado no Histórico): `4111 1111 1111 1111` aprova; `4000 0000 0000 0002` é recusado. Qualquer validade futura e CVV.
 - Nenhum valor real é cobrado.
 
+## Banco no Supabase
+1. No painel do Supabase, abra **SQL Editor → New query**, cole o conteúdo de
+   `supabase/migrations/20261021150000_agendou_schema.sql` e clique em **Run**.
+   Ele cria as 18 tabelas, os relacionamentos, os índices, as travas de integridade e as políticas de RLS (cada empresa só enxerga os próprios dados).
+2. Em **Project Settings → Database → Connection string (URI)**, copie a string e coloque em `DATABASE_URL`.
+3. Rode o app. Com o banco vazio, ele cria a empresa de exemplo. Para não criar, use `SEED=0`.
+
+Quem usa a CLI do Supabase pode rodar `supabase db push`, que aplica a mesma migration.
+
 ## Variáveis de ambiente (opcionais) — ver `.env.example`
 | Variável | Para quê |
 |---|---|
 | `DATABASE_URL` | Usar Postgres/Supabase em vez do banco embutido |
+| `SEED=0` | Não criar a empresa de exemplo num banco vazio |
 | `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN` | Enviar notificações de verdade (sem isso, ficam registradas no painel) |
 | `CRON_SECRET` | Proteger `POST /api/cron/expirar` |
 | `PAGAMENTOS_SANDBOX=0` | Desliga o botão de simular pagamento |

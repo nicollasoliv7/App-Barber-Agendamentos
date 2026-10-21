@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 import { salvarCliente } from "../../acoes";
@@ -23,7 +23,7 @@ type C = {
 };
 
 export default async function Page({ searchParams }: PageProps<"/painel/clientes">) {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const sp = await searchParams;
   const busca = typeof sp.q === "string" ? sp.q.trim() : "";
   const clientes = await q<C>(

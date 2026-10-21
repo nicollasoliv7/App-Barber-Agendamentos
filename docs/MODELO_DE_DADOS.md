@@ -111,7 +111,9 @@ id, empresa_id, nome, telefone (só dígitos), email null, senha_hash null, tele
 | observacao | text | |
 | criado_em | timestamptz | |
 
-Restrição anti-conflito: na aplicação, a checagem e a inserção acontecem na mesma transação. No Postgres/Supabase há ainda um `EXCLUDE USING gist (profissional_id WITH =, tstzrange(inicio, fim) WITH &&) WHERE status in (...)`, usando a extensão `btree_gist`.
+Restrição anti-conflito: na aplicação, a checagem e a inserção acontecem na mesma transação. No Supabase, a migration acrescenta `EXCLUDE USING gist (profissional_id WITH =, tstzrange(inicio, fim) WITH &&) WHERE status in (...)` com a extensão `btree_gist`, e chaves estrangeiras compostas `(cliente_id|profissional_id|servico_id, empresa_id)` que garantem que tudo seja da mesma empresa.
+
+Colunas acrescentadas: `agendamento.lembrete_enviado_em` (R14b) e `usuario_painel.auth_user_id` (vínculo com o Supabase Auth, usado pela RLS).
 
 ### pagamento
 id, agendamento_id, metodo (`pix` \| `cartao` \| `local`), tipo (`minimo` \| `integral`), valor_centavos, status (`pendente` \| `pago` \| `expirado` \| `cancelado` \| `estornado`), provedor (`sandbox`), provedor_ref, pix_copia_cola, expira_em, pago_em, criado_em.

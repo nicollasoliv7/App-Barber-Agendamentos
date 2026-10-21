@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { DIAS_SEMANA, hhmm } from "@/lib/tempo";
 import { adicionarFaixa, removerFaixa } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
@@ -7,7 +7,7 @@ import { Campo, Form, inp } from "../../Form";
 export const metadata = { title: "Horários" };
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const profs = await q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 and ativo order by nome`, [u.empresa_id]);
   const faixas = await q<{ id: string; profissional_id: string; dia_semana: number; inicio_min: number; fim_min: number }>(
     `select d.* from disponibilidade d join profissional p on p.id = d.profissional_id where p.empresa_id = $1 order by dia_semana, inicio_min`,

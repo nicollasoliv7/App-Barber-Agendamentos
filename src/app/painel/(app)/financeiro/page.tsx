@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { diaLocal, instanteLocal, reais, somarDias } from "@/lib/tempo";
 import { inp } from "../../Form";
@@ -7,7 +7,7 @@ import { inp } from "../../Form";
 export const metadata = { title: "Financeiro" };
 
 export default async function Page({ searchParams }: PageProps<"/painel/financeiro">) {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const cfg = await configAgendamento(u.empresa_id);
   const sp = await searchParams;
   const hoje = diaLocal(new Date(), cfg.fuso_horario);

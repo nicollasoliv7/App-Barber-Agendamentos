@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import type { Servico } from "@/lib/tipos";
 import { salvarServico } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
@@ -41,7 +41,7 @@ function Campos({ s }: { s?: Servico }) {
 }
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const servicos = await q<Servico>(`select * from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]);
   return (
     <div className="grid gap-6">

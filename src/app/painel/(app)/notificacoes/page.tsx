@@ -1,12 +1,12 @@
 import { q } from "@/lib/db";
-import { usuarioPainel } from "@/lib/sessao";
+import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 
 export const metadata = { title: "Notificações" };
 
 export default async function Page() {
-  const u = (await usuarioPainel())!;
+  const u = await usuarioOuLogin();
   const ns = await q<{ id: string; canal: string; destino: string; mensagem: string; status: string; criado_em: Date }>(
     `select id, canal, destino, mensagem, status, criado_em from notificacao where empresa_id = $1 order by criado_em desc limit 100`,
     [u.empresa_id],
