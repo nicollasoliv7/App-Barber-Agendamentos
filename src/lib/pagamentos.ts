@@ -1,6 +1,6 @@
 import "server-only";
 import QRCode from "qrcode";
-import { tx, type Executor } from "./db";
+import { q, tx, type Executor } from "./db";
 import { configAgendamento, valorCobranca } from "./empresa";
 import { expirarPendentes } from "./disponibilidade";
 import { notificarConfirmacao } from "./agendamentos";
@@ -216,4 +216,34 @@ export async function pagarComCartao(agendamentoId: string, cartaoId: string, ti
     await aprovar(t, p.id, ag.id);
     return { aprovado: true as const, pagamentoId: p.id, valor_centavos: valor };
   });
+}
+
+// ---------- Recebimento no balcão e estorno (painel) ----------
+
+/** "Recebi no local": registra só o saldo = preço − parte coberta pelo plano − o que já foi pago (nunca cobra duas vezes). */
+export async function registrarRecebimentoLocal(empresaId: string, id: string) {
+  await tx(async (t) => {
+    const [ag] = await t.query<{ saldo: number }>(
+      `select preco_centavos - valor_coberto_centavos
+              - coalesce((select sum(valor_centavos) from pagamento where agendamento_id = a.id and status='pago'),0)::int as saldo
+       from agendamento a where id = $1 and empresa_id = $2 for update`,
+      [id, empresaId],
+    );
+    if (!ag || ag.saldo <= 0) return;
+    await t.query(
+      `insert into pagamento (agendamento_id, metodo, tipo, valor_centavos, status, pago_em) values ($1,'local','integral',$2,'pago',now())`,
+      [id, ag.saldo],
+    );
+  });
+}
+
+/** Estorna pagamentos aprovados de um agendamento cancelado (R24). No sandbox apenas marca como estornado. */
+export async function estornarPagamentosCancelado(empresaId: string, id: string) {
+  await q(
+    `update pagamento p set status = 'estornado'
+     from agendamento a
+     where p.agendamento_id = a.id and a.id = $1 and a.empresa_id = $2 and a.status = 'cancelado'
+       and p.status = 'pago' and p.metodo in ('pix','cartao')`,
+    [id, empresaId],
+  );
 }

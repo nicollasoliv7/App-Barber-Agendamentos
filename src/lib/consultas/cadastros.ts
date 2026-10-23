@@ -53,3 +53,6 @@ export const bloqueiosFuturos = (empresaId: string) =>
      where b.empresa_id = $1 and b.fim > now() order by b.inicio`,
     [empresaId],
   );
+
+export const clientePorTelefone = (empresaId: string, telefone: string) =>
+  q1<{ id: string }>(`select id from cliente where empresa_id = $1 and telefone = $2`, [empresaId, telefone]);

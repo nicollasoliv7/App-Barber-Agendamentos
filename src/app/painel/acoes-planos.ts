@@ -2,19 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { q1, tx } from "@/lib/db";
+import { clientePorTelefone } from "@/lib/consultas/cadastros";
 import { usuarioPainel } from "@/lib/sessao";
 import { editarPelaEmpresa } from "@/lib/agendamentos";
 import {
-  aplicarCobertura,
   cancelarAssinatura,
+  cobrarAvulso,
   criarAssinatura,
   desfazerPagamentoMensalidade,
   registrarPagamentoMensalidade,
-  removerCobertura,
   salvarPlano,
+  usarPlanoNoAtendimento,
 } from "@/lib/planos";
-import { ErroNegocio, type Agendamento } from "@/lib/tipos";
+import { ErroNegocio } from "@/lib/tipos";
 import { isUuid, normalizarTelefone } from "@/lib/validacao";
 import type { Estado } from "./acoes";
 import { log } from "@/lib/log";
@@ -92,7 +92,7 @@ export async function assinarPlanoAcao(_: Estado, f: FormData): Promise<Estado> 
       // veio do campo de busca: "Nome · (11) 91234-5678" ou só o celular
       const bruto = txt(f, "cliente");
       const tel = normalizarTelefone(bruto.includes("·") ? bruto.split("·").pop()! : bruto);
-      const c = tel ? await q1<{ id: string }>(`select id from cliente where empresa_id = $1 and telefone = $2`, [u.empresa_id, tel]) : undefined;
+      const c = tel ? await clientePorTelefone(u.empresa_id, tel) : undefined;
       if (!c) throw new ErroNegocio("Cliente não encontrado. Escolha um da lista ou cadastre-o em Clientes.");
       clienteId = c.id;
     }
@@ -142,14 +142,7 @@ export async function usarPlanoAcao(f: FormData) {
   const u = await usuario();
   const id = txt(f, "id");
   if (!isUuid(id)) return;
-  await tx(async (t) => {
-    const [ag] = await t.query<Agendamento>(`select * from agendamento where id = $1 and empresa_id = $2 for update`, [id, u.empresa_id]);
-    if (!ag || !["confirmado", "concluido"].includes(ag.status)) return;
-    // não cobre por cima de um pagamento já feito: evita "pagou e usou o plano" no mesmo atendimento
-    const [pago] = await t.query(`select 1 from pagamento where agendamento_id = $1 and status = 'pago'`, [id]);
-    if (pago) return;
-    await aplicarCobertura(t, ag);
-  });
+  await usarPlanoNoAtendimento(u.empresa_id, id);
   revalidatePath("/painel", "layout");
 }
 
@@ -158,10 +151,7 @@ export async function cobrarAvulsoAcao(f: FormData) {
   const u = await usuario();
   const id = txt(f, "id");
   if (!isUuid(id)) return;
-  await tx(async (t) => {
-    const [ag] = await t.query(`select 1 from agendamento where id = $1 and empresa_id = $2`, [id, u.empresa_id]);
-    if (ag) await removerCobertura(t, id);
-  });
+  await cobrarAvulso(u.empresa_id, id);
   revalidatePath("/painel", "layout");
 }
 

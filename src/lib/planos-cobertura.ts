@@ -1,5 +1,5 @@
 import "server-only";
-import type { Executor } from "./db";
+import { tx, type Executor } from "./db";
 import type { Agendamento } from "./tipos";
 import { diaLocal } from "./tempo";
 import { cicloDe, hojeDaEmpresa, sincronizarAssinaturas } from "./planos-ciclos";
@@ -99,4 +99,24 @@ export async function reavaliarCobertura(t: Executor, id: string) {
   if (!ag || !tinha) return;
   await removerCobertura(t, id);
   await aplicarCobertura(t, ag);
+}
+
+/** "Usar plano" pelo painel: registra o uso se o plano cobrir e se o atendimento ainda não tiver pagamento. */
+export async function usarPlanoNoAtendimento(empresaId: string, id: string) {
+  await tx(async (t) => {
+    const [ag] = await t.query<Agendamento>(`select * from agendamento where id = $1 and empresa_id = $2 for update`, [id, empresaId]);
+    if (!ag || !["confirmado", "concluido"].includes(ag.status)) return;
+    // não cobre por cima de um pagamento já feito: evita "pagou e usou o plano" no mesmo atendimento
+    const [pago] = await t.query(`select 1 from pagamento where agendamento_id = $1 and status = 'pago'`, [id]);
+    if (pago) return;
+    await aplicarCobertura(t, ag);
+  });
+}
+
+/** "Cobrar avulso": desfaz o uso do plano num atendimento desta empresa. */
+export async function cobrarAvulso(empresaId: string, id: string) {
+  await tx(async (t) => {
+    const [ag] = await t.query(`select 1 from agendamento where id = $1 and empresa_id = $2`, [id, empresaId]);
+    if (ag) await removerCobertura(t, id);
+  });
 }

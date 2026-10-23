@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { q, tx } from "@/lib/db";
 import { encerrarSessao, loginPainel, usuarioPainel } from "@/lib/sessao";
 import { criarAgendamento, mudarStatusPelaEmpresa } from "@/lib/agendamentos";
 import { instanteLocal, paraMinutos } from "@/lib/tempo";
@@ -10,6 +9,12 @@ import { ErroNegocio } from "@/lib/tipos";
 import { configAgendamento } from "@/lib/empresa";
 import { isUuid, normalizarTelefone } from "@/lib/validacao";
 import { log } from "@/lib/log";
+import { estornarPagamentosCancelado, registrarRecebimentoLocal } from "@/lib/pagamentos";
+import { atualizarServico, criarServico } from "@/lib/repositorios/servicos";
+import { salvarProfissionalDados } from "@/lib/repositorios/profissionais";
+import { adicionarFaixas, criarBloqueio, removerBloqueioDaEmpresa, removerFaixaDaEmpresa } from "@/lib/repositorios/horarios";
+import { atualizarCampo, atualizarEmpresa, atualizarRegras, atualizarTema, atualizarUnidade, criarCampo, criarUnidade } from "@/lib/repositorios/configuracoes";
+import { atualizarCliente, cadastrarCliente } from "@/lib/repositorios/clientes";
 
 export type Estado = { erro?: string; ok?: string } | undefined;
 
@@ -87,20 +92,7 @@ export async function registrarPagamentoLocal(f: FormData) {
   const u = await exigirUsuario();
   const id = txt(f, "id");
   if (!isUuid(id)) return;
-  await tx(async (t) => {
-    // saldo = preço − parte coberta pelo plano − o que já foi pago (nunca cobra duas vezes)
-    const [ag] = await t.query<{ saldo: number }>(
-      `select preco_centavos - valor_coberto_centavos
-              - coalesce((select sum(valor_centavos) from pagamento where agendamento_id = a.id and status='pago'),0)::int as saldo
-       from agendamento a where id = $1 and empresa_id = $2 for update`,
-      [id, u.empresa_id],
-    );
-    if (!ag || ag.saldo <= 0) return;
-    await t.query(
-      `insert into pagamento (agendamento_id, metodo, tipo, valor_centavos, status, pago_em) values ($1,'local','integral',$2,'pago',now())`,
-      [id, ag.saldo],
-    );
-  });
+  await registrarRecebimentoLocal(u.empresa_id, id);
   revalidatePath("/painel", "layout");
 }
 
@@ -116,27 +108,18 @@ export async function salvarServico(_: Estado, f: FormData): Promise<Estado> {
     if (!nome) throw new ErroNegocio("Informe o nome");
     if (!Number.isFinite(preco) || preco < 0) throw new ErroNegocio("Preço inválido");
     if (!Number.isInteger(dur) || dur < 5 || dur > 600) throw new ErroNegocio("Duração entre 5 e 600 minutos");
-    const vals = [nome, txt(f, "descricao") || null, txt(f, "observacao") || null, preco, dur, f.get("ativo") === "on", num(f, "ordem") || 0, txt(f, "imagem_url") || null];
-    if (isUuid(id)) {
-      await q(
-        `update servico set nome=$1, descricao=$2, observacao=$3, preco_centavos=$4, duracao_min=$5, ativo=$6, ordem=$7, imagem_url=$8
-         where id=$9 and empresa_id=$10`,
-        [...vals, id, u.empresa_id],
-      );
-    } else {
-      await tx(async (t) => {
-        const [s] = await t.query<{ id: string }>(
-          `insert into servico (nome, descricao, observacao, preco_centavos, duracao_min, ativo, ordem, imagem_url, empresa_id)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-          [...vals, u.empresa_id],
-        );
-        // novo serviço: todos os profissionais ativos passam a fazê-lo (ajustável em Profissionais)
-        await t.query(
-          `insert into profissional_servico (profissional_id, servico_id) select id, $1 from profissional where empresa_id = $2 and ativo`,
-          [s.id, u.empresa_id],
-        );
-      });
-    }
+    const dados = {
+      nome,
+      descricao: txt(f, "descricao") || null,
+      observacao: txt(f, "observacao") || null,
+      preco_centavos: preco,
+      duracao_min: dur,
+      ativo: f.get("ativo") === "on",
+      ordem: num(f, "ordem") || 0,
+      imagem_url: txt(f, "imagem_url") || null,
+    };
+    if (isUuid(id)) await atualizarServico(u.empresa_id, id, dados);
+    else await criarServico(u.empresa_id, dados);
     return "Serviço salvo";
   });
 }
@@ -152,36 +135,13 @@ export async function salvarProfissional(_: Estado, f: FormData): Promise<Estado
     const com = num(f, "comissao");
     if (!Number.isInteger(com) || com < 0 || com > 100) throw new ErroNegocio("Comissão entre 0 e 100%");
     const servicos = f.getAll("servicos").map(String).filter(isUuid);
-    await tx(async (t) => {
-      let pid = id;
-      if (isUuid(id)) {
-        await t.query(
-          `update profissional set nome=$1, telefone=$2, comissao_pct=$3, ativo=$4,
-             unidade_id = (select id from unidade where id = nullif($7,'')::uuid and empresa_id = $6)
-           where id=$5 and empresa_id=$6`,
-          [nome, txt(f, "telefone") || null, com, f.get("ativo") === "on", id, u.empresa_id, isUuid(txt(f, "unidade")) ? txt(f, "unidade") : ""],
-        );
-      } else {
-        const [p] = await t.query<{ id: string }>(
-          `insert into profissional (empresa_id, nome, telefone, comissao_pct, ativo, unidade_id)
-           values ($1,$2,$3,$4,true,(select id from unidade where id = nullif($5,'')::uuid and empresa_id = $1)) returning id`,
-          [u.empresa_id, nome, txt(f, "telefone") || null, com, isUuid(txt(f, "unidade")) ? txt(f, "unidade") : ""],
-        );
-        pid = p.id;
-        // expediente padrão: seg–sex 09–18, sáb 09–14
-        for (let d = 1; d <= 6; d++)
-          await t.query(`insert into disponibilidade (profissional_id, dia_semana, inicio_min, fim_min) values ($1,$2,540,$3)`, [
-            pid,
-            d,
-            d === 6 ? 840 : 1080,
-          ]);
-      }
-      await t.query(`delete from profissional_servico where profissional_id = $1`, [pid]);
-      for (const s of servicos)
-        await t.query(
-          `insert into profissional_servico (profissional_id, servico_id) select $1, id from servico where id = $2 and empresa_id = $3`,
-          [pid, s, u.empresa_id],
-        );
+    await salvarProfissionalDados(u.empresa_id, isUuid(id) ? id : null, {
+      nome,
+      telefone: txt(f, "telefone") || null,
+      comissao_pct: com,
+      ativo: f.get("ativo") === "on",
+      unidade: isUuid(txt(f, "unidade")) ? txt(f, "unidade") : "",
+      servicos,
     });
     return "Profissional salvo";
   });
@@ -198,28 +158,14 @@ export async function adicionarFaixa(_: Estado, f: FormData): Promise<Estado> {
     const fim = paraMinutos(txt(f, "fim"));
     if (!dias.length) throw new ErroNegocio("Escolha pelo menos um dia");
     if (!(fim > ini)) throw new ErroNegocio("O fim precisa ser depois do início");
-    await tx(async (t) => {
-      const [p] = await t.query(`select 1 from profissional where id = $1 and empresa_id = $2`, [prof, u.empresa_id]);
-      if (!p) throw new ErroNegocio("Profissional inválido");
-      for (const d of dias) {
-        const [sob] = await t.query(
-          `select 1 from disponibilidade where profissional_id=$1 and dia_semana=$2 and inicio_min < $4 and fim_min > $3`,
-          [prof, d, ini, fim],
-        );
-        if (sob) throw new ErroNegocio("Essa faixa se sobrepõe a outra já cadastrada");
-        await t.query(`insert into disponibilidade (profissional_id, dia_semana, inicio_min, fim_min) values ($1,$2,$3,$4)`, [prof, d, ini, fim]);
-      }
-    });
+    await adicionarFaixas(u.empresa_id, prof, dias, ini, fim);
     return "Horário adicionado";
   });
 }
 
 export async function removerFaixa(f: FormData) {
   const u = await exigirUsuario();
-  await q(
-    `delete from disponibilidade d using profissional p where d.id = $1 and p.id = d.profissional_id and p.empresa_id = $2`,
-    [txt(f, "id"), u.empresa_id],
-  );
+  await removerFaixaDaEmpresa(u.empresa_id, txt(f, "id"));
   revalidatePath("/painel", "layout");
 }
 
@@ -238,20 +184,14 @@ export async function adicionarBloqueio(_: Estado, f: FormData): Promise<Estado>
     const inicio = instanteLocal(diaIni, paraMinutos(horaIni), cfg.fuso_horario);
     const fim = instanteLocal(diaFim, paraMinutos(horaFim) + (txt(f, "hora_fim") ? 0 : 1), cfg.fuso_horario);
     if (fim <= inicio) throw new ErroNegocio("O fim precisa ser depois do início");
-    await q(`insert into bloqueio (empresa_id, profissional_id, inicio, fim, motivo) values ($1,$2,$3,$4,$5)`, [
-      u.empresa_id,
-      isUuid(prof) ? prof : null,
-      inicio,
-      fim,
-      txt(f, "motivo") || null,
-    ]);
+    await criarBloqueio(u.empresa_id, isUuid(prof) ? prof : null, inicio, fim, txt(f, "motivo") || null);
     return "Bloqueio criado";
   });
 }
 
 export async function removerBloqueio(f: FormData) {
   const u = await exigirUsuario();
-  await q(`delete from bloqueio where id = $1 and empresa_id = $2`, [txt(f, "id"), u.empresa_id]);
+  await removerBloqueioDaEmpresa(u.empresa_id, txt(f, "id"));
   revalidatePath("/painel", "layout");
 }
 
@@ -263,20 +203,16 @@ export async function salvarEmpresa(_: Estado, f: FormData): Promise<Estado> {
     const slug = txt(f, "slug").toLowerCase();
     if (!/^[a-z0-9]([a-z0-9-]{1,48}[a-z0-9])$/.test(slug)) throw new ErroNegocio("Endereço da página: use letras minúsculas, números e hífen");
     if (["api", "painel", "_next"].includes(slug)) throw new ErroNegocio("Esse endereço é reservado");
-    await q(
-      `update empresa set nome=$1, slug=$2, telefone_whatsapp=$3, endereco=$4, maps_url=$5, logo_url=$6, pixel_campanha=$7, multiunidade=$8 where id=$9`,
-      [
-        txt(f, "nome"),
-        slug,
-        txt(f, "telefone_whatsapp").replace(/\D/g, "") || null,
-        txt(f, "endereco") || null,
-        txt(f, "maps_url") || null,
-        txt(f, "logo_url") || null,
-        txt(f, "pixel_campanha") || null,
-        f.get("multiunidade") === "on",
-        u.empresa_id,
-      ],
-    );
+    await atualizarEmpresa(u.empresa_id, {
+      nome: txt(f, "nome"),
+      slug,
+      telefone_whatsapp: txt(f, "telefone_whatsapp").replace(/\D/g, "") || null,
+      endereco: txt(f, "endereco") || null,
+      maps_url: txt(f, "maps_url") || null,
+      logo_url: txt(f, "logo_url") || null,
+      pixel_campanha: txt(f, "pixel_campanha") || null,
+      multiunidade: f.get("multiunidade") === "on",
+    });
     return "Dados da empresa salvos";
   });
 }
@@ -286,7 +222,7 @@ export async function salvarTema(_: Estado, f: FormData): Promise<Estado> {
   return executar(async () => {
     const cores = ["cor_primaria", "cor_secundaria", "cor_fundo", "cor_texto"].map((k) => txt(f, k));
     if (cores.some((c) => !/^#[0-9a-fA-F]{6}$/.test(c))) throw new ErroNegocio("Cor inválida");
-    await q(`update config_tema set cor_primaria=$1, cor_secundaria=$2, cor_fundo=$3, cor_texto=$4 where empresa_id=$5`, [...cores, u.empresa_id]);
+    await atualizarTema(u.empresa_id, cores);
     return "Tema salvo";
   });
 }
@@ -306,12 +242,7 @@ export async function salvarRegras(_: Estado, f: FormData): Promise<Estado> {
     if (campos.some((n) => !Number.isInteger(n) || n < 0)) throw new ErroNegocio("Use números inteiros");
     const modo = txt(f, "pagamento_modo");
     const tipo = txt(f, "pagamento_tipo");
-    await q(
-      `update config_agendamento set intervalo_slots_min=$1, antecedencia_min_min=$2, janela_max_dias=$3, cancelamento_ate_min=$4,
-         remarcacao_ate_min=$5, pagamento_minimo_pct=$6, pix_expiracao_min=$7, pagamento_modo=$8, pagamento_tipo=$9
-       where empresa_id=$10`,
-      [...campos, modo, tipo, u.empresa_id],
-    );
+    await atualizarRegras(u.empresa_id, campos, modo, tipo);
     return "Regras salvas";
   });
 }
@@ -321,13 +252,7 @@ export async function salvarCampo(_: Estado, f: FormData): Promise<Estado> {
   return executar(async () => {
     const id = txt(f, "id");
     if (isUuid(id)) {
-      await q(`update campo_personalizado set rotulo=$1, obrigatorio=$2, ativo=$3 where id=$4 and empresa_id=$5`, [
-        txt(f, "rotulo"),
-        f.get("obrigatorio") === "on",
-        f.get("ativo") === "on",
-        id,
-        u.empresa_id,
-      ]);
+      await atualizarCampo(u.empresa_id, id, txt(f, "rotulo"), f.get("obrigatorio") === "on", f.get("ativo") === "on");
     } else {
       const rotulo = txt(f, "rotulo");
       if (!rotulo) throw new ErroNegocio("Informe o rótulo");
@@ -339,11 +264,7 @@ export async function salvarCampo(_: Estado, f: FormData): Promise<Estado> {
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_|_$/g, "")
           .slice(0, 40) || "campo";
-      await q(
-        `insert into campo_personalizado (empresa_id, chave, rotulo, tipo, obrigatorio, ordem, ativo)
-         values ($1,$2,$3,$4,$5,(select coalesce(max(ordem),0)+1 from campo_personalizado where empresa_id=$1),true)`,
-        [u.empresa_id, chave, rotulo, txt(f, "tipo") || "texto", f.get("obrigatorio") === "on"],
-      );
+      await criarCampo(u.empresa_id, chave, rotulo, txt(f, "tipo") || "texto", f.get("obrigatorio") === "on");
     }
     return "Campo salvo";
   });
@@ -356,14 +277,8 @@ export async function salvarCliente(_: Estado, f: FormData): Promise<Estado> {
     if (nome.length < 2) throw new ErroNegocio("Informe o nome");
     const email = txt(f, "email");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroNegocio("E-mail inválido");
-    const r = await q(`update cliente set nome=$1, email=$2, observacoes=$3 where id=$4 and empresa_id=$5 returning id`, [
-      nome,
-      email || null,
-      txt(f, "observacoes").slice(0, 1000) || null,
-      txt(f, "id"),
-      u.empresa_id,
-    ]);
-    if (!r.length) throw new ErroNegocio("Cliente não encontrado");
+    const ok = await atualizarCliente(u.empresa_id, txt(f, "id"), nome, email || null, txt(f, "observacoes").slice(0, 1000) || null);
+    if (!ok) throw new ErroNegocio("Cliente não encontrado");
     return "Cliente salvo";
   });
 }
@@ -377,12 +292,8 @@ export async function novoCliente(_: Estado, f: FormData): Promise<Estado> {
     if (!telefone) throw new ErroNegocio("Telefone inválido. Use DDD + número.");
     const email = txt(f, "email");
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroNegocio("E-mail inválido");
-    const r = await q(
-      `insert into cliente (empresa_id, nome, telefone, email, observacoes, origem) values ($1,$2,$3,$4,$5,'painel')
-       on conflict (empresa_id, telefone) do nothing returning id`,
-      [u.empresa_id, nome, telefone, email || null, txt(f, "observacoes") || null],
-    );
-    if (!r.length) throw new ErroNegocio("Já existe um cliente com esse telefone");
+    const ok = await cadastrarCliente(u.empresa_id, nome, telefone, email || null, txt(f, "observacoes") || null);
+    if (!ok) throw new ErroNegocio("Já existe um cliente com esse telefone");
     return "Cliente cadastrado";
   });
 }
@@ -395,17 +306,10 @@ export async function salvarUnidade(_: Estado, f: FormData): Promise<Estado> {
     const id = txt(f, "id");
     const nome = txt(f, "nome");
     if (!nome) throw new ErroNegocio("Informe o nome da unidade");
-    const vals = [nome, txt(f, "endereco") || null, txt(f, "maps_url") || null];
-    if (isUuid(id)) {
-      await q(`update unidade set nome=$1, endereco=$2, maps_url=$3, ativo=$4 where id=$5 and empresa_id=$6`, [
-        ...vals,
-        f.get("ativo") === "on",
-        id,
-        u.empresa_id,
-      ]);
-    } else {
-      await q(`insert into unidade (nome, endereco, maps_url, empresa_id) values ($1,$2,$3,$4)`, [...vals, u.empresa_id]);
-    }
+    const endereco = txt(f, "endereco") || null;
+    const mapsUrl = txt(f, "maps_url") || null;
+    if (isUuid(id)) await atualizarUnidade(u.empresa_id, id, nome, endereco, mapsUrl, f.get("ativo") === "on");
+    else await criarUnidade(u.empresa_id, nome, endereco, mapsUrl);
     return "Unidade salva";
   });
 }
@@ -417,12 +321,6 @@ export async function estornarPagamentos(f: FormData) {
   const u = await exigirUsuario();
   const id = txt(f, "id");
   if (!isUuid(id)) return;
-  await q(
-    `update pagamento p set status = 'estornado'
-     from agendamento a
-     where p.agendamento_id = a.id and a.id = $1 and a.empresa_id = $2 and a.status = 'cancelado'
-       and p.status = 'pago' and p.metodo in ('pix','cartao')`,
-    [id, u.empresa_id],
-  );
+  await estornarPagamentosCancelado(u.empresa_id, id);
   revalidatePath("/painel", "layout");
 }
