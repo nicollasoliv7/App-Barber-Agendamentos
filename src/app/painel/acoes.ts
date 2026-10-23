@@ -87,15 +87,17 @@ export async function registrarPagamentoLocal(f: FormData) {
   const id = txt(f, "id");
   if (!isUuid(id)) return;
   await tx(async (t) => {
-    const [ag] = await t.query<{ preco_centavos: number; pago: number }>(
-      `select preco_centavos, coalesce((select sum(valor_centavos) from pagamento where agendamento_id = a.id and status='pago'),0)::int as pago
-       from agendamento a where id = $1 and empresa_id = $2`,
+    // saldo = preço − parte coberta pelo plano − o que já foi pago (nunca cobra duas vezes)
+    const [ag] = await t.query<{ saldo: number }>(
+      `select preco_centavos - valor_coberto_centavos
+              - coalesce((select sum(valor_centavos) from pagamento where agendamento_id = a.id and status='pago'),0)::int as saldo
+       from agendamento a where id = $1 and empresa_id = $2 for update`,
       [id, u.empresa_id],
     );
-    if (!ag || ag.preco_centavos - ag.pago <= 0) return;
+    if (!ag || ag.saldo <= 0) return;
     await t.query(
       `insert into pagamento (agendamento_id, metodo, tipo, valor_centavos, status, pago_em) values ($1,'local','integral',$2,'pago',now())`,
-      [id, ag.preco_centavos - ag.pago],
+      [id, ag.saldo],
     );
   });
   revalidatePath("/painel", "layout");

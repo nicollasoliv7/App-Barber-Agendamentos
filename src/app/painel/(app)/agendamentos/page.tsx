@@ -31,6 +31,7 @@ type Linha = {
   servico: string;
   profissional: string;
   token_publico: string;
+  valor_coberto_centavos: number;
 };
 
 const PERIODOS = [
@@ -56,7 +57,7 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
 
   const [linhas, [tot], servicos, profissionais] = await Promise.all([
     q<Linha>(
-      `select a.id, a.inicio, a.status, a.origem, a.preco_centavos, a.cliente_id, a.token_publico,
+      `select a.id, a.inicio, a.status, a.origem, a.preco_centavos, a.cliente_id, a.token_publico, a.valor_coberto_centavos,
               coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago,
               c.nome as cliente, c.telefone, s.nome as servico, pr.nome as profissional
        from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id join profissional pr on pr.id = a.profissional_id
@@ -64,7 +65,7 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
       params,
     ),
     q<{ n: number; valor: number }>(
-      `select count(*)::int as n, coalesce(sum(a.preco_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor
+      `select count(*)::int as n, coalesce(sum(a.preco_centavos - a.valor_coberto_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor
        from agendamento a where ${where}`,
       params,
     ),
@@ -118,6 +119,9 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
                   <td className="text-right num">
                     {reais(a.preco_centavos)}
                     {a.pago > 0 && <div className="text-xs text-[#7ee2b0]">pago {reais(a.pago)}</div>}
+                    {a.valor_coberto_centavos > 0 && (
+                      <div className="text-xs text-[#7ee2b0]">{a.valor_coberto_centavos >= a.preco_centavos ? "coberto pelo plano" : `plano cobre ${reais(a.valor_coberto_centavos)}`}</div>
+                    )}
                   </td>
                   <td>
                     <StatusBadge status={a.status} />

@@ -34,6 +34,7 @@ export function Logo({ nome = "Agendou", className = "" }: { nome?: string; clas
 
 type IconeNome =
   | "calendario"
+  | "recorrente"
   | "usuarios"
   | "tesoura"
   | "pessoa"
@@ -85,6 +86,7 @@ const PATHS: Record<IconeNome, string> = {
   sair: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   escudo: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4",
   raio: "M13 2 3 14h9l-1 8 10-12h-9l1-8Z",
+  recorrente: "M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3",
   alerta: "M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
 };
 

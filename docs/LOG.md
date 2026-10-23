@@ -175,3 +175,56 @@ Teste final no seu PC: o cliente fictício "Paulo Teste Windows" agendou Barba �
 3. Por barbearia: número verificado, token permanente, modelos aprovados e conexão no painel.
 
 **Próximo passo exato**: autorizar o acesso da Vercel e publicar; depois seguir `docs/WHATSAPP.md`, parte A.
+
+---
+
+## v5 — Gestão completa + planos mensais (módulo opcional) · 22/10/2026
+
+**Diagnóstico (antes)**
+- **Já existia:** agenda, agendamentos, CRM, financeiro, dashboard e página pública.
+- **Lacunas:**
+  - não havia planos mensais;
+  - não dava para editar um agendamento pelo painel;
+  - faltavam os indicadores "a receber" e "clientes recorrentes".
+- **Risco:** com planos, o faturamento contaria o atendimento coberto duas vezes, e Pix/"Recebi no local" cobrariam de novo.
+
+**O que foi feito**
+- **Banco** (só adições):
+  - tabelas `plano`, `plano_servico`, `assinatura`, `assinatura_cobranca` e `assinatura_uso`;
+  - coluna `agendamento.valor_coberto_centavos`;
+  - migration `supabase/migrations/20261022230000_planos.sql` (RLS, chaves compostas; assinaturas, mensalidades e usos somente leitura pela API).
+- **Regras** (`src/lib/planos.ts`, R57–R67):
+  - ciclos sem deriva, uma mensalidade por ciclo e status separados (assinatura × mensalidade);
+  - cobertura automática ao agendar, com "Usar plano" e "Cobrar avulso";
+  - limite por ciclo e valor adicional por serviço;
+  - cancelar ou remarcar devolve ou recalcula o uso;
+  - cancelar a assinatura tira a cobertura só dos atendimentos futuros.
+- **Sem cobrança duplicada:** "Recebi no local", Pix e Pix obrigatório usam o saldo `preço − coberto`. Faturamento, ticket, CRM e CSV não contam de novo o valor coberto.
+- **Telas:**
+  - nova **Planos** (orientação quando vazia; indicadores, assinantes com filtro, renovações, adicionar assinante, criar e editar planos);
+  - bloco **Plano mensal** na ficha do cliente;
+  - selos e ações na agenda;
+  - **Financeiro** reorganizado (atendimentos × planos, a receber com ações, mensalidades em aberto);
+  - dashboard com **A receber**, **Clientes atendidos** e **Clientes recorrentes**, e painel de planos só para quem usa;
+  - CRM com segmento **Recorrentes** e **Com plano** (este só com planos);
+  - **editar agendamento** pela agenda.
+- **Navegação:** Financeiro subiu para perto de Clientes; Planos entrou logo depois, como item próprio.
+- **Posicionamento:** a página inicial e as metatags passaram a usar "Tudo o que sua barbearia precisa para funcionar melhor"; os planos aparecem como diferencial opcional.
+- **Testes:**
+  - `e2e/planos.mjs` (49 verificações, cobrindo os 10 cenários pedidos);
+  - suites anteriores aprovadas: fluxo completo, Pix e histórico, responsivo com `/painel/planos`, WhatsApp;
+  - migration aplicada num Postgres 16 simulando o Supabase;
+  - lint, tipos e build limpos.
+
+**Decisões**
+- Mensalidade vence no início do ciclo (pré-pago); tolerância fixa de 5 dias antes de "atrasada".
+- O uso do plano é registrado ao agendar (reserva o benefício) e devolvido se o atendimento for cancelado. Falta não devolve automaticamente; o barbeiro decide com "Cobrar avulso".
+- Comissão continua sobre o valor do serviço, mesmo coberto (o barbeiro trabalhou). Isso fica explícito na tela.
+- A página pública mostra "Incluído no seu plano" só para quem agendou com aquele telefone.
+
+**Pendências (externas)**
+1. Cobrança automática de mensalidades (cartão ou Pix recorrente): depende de um gateway de pagamento real e de credenciais.
+2. Tolerância de inadimplência configurável por barbearia (hoje fixa em 5 dias).
+3. Itens anteriores: deploy na Vercel (autorização do time), contas da Meta para o WhatsApp, painel de referência.
+
+**Próximo passo exato**: publicar (Vercel) e criar o primeiro plano real em `/painel/planos`.

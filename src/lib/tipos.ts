@@ -87,6 +87,8 @@ export interface Agendamento {
   token_publico: string;
   observacao: string | null;
   criado_em: Date;
+  /** parte do preço coberta por plano mensal (0 = avulso) */
+  valor_coberto_centavos: number;
 }
 
 export class ErroNegocio extends Error {

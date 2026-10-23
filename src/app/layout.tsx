@@ -6,8 +6,8 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: { default: "Agendou — agenda online para barbearias", template: "%s · Agendou" },
-  description: "Agendamento online sem login, CRM de clientes e migração simples para barbearias.",
+  title: { default: "Agendou — gestão para barbearias", template: "%s · Agendou" },
+  description: "Tudo o que sua barbearia precisa para funcionar melhor: agenda, clientes, pagamentos e planos mensais em um só lugar.",
 };
 
 export const viewport: Viewport = { themeColor: "#07080a", colorScheme: "dark" };

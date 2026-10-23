@@ -45,6 +45,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/public/[slug]/a
           inicio: ag.inicio,
           fim: ag.fim,
           preco_centavos: ag.preco_centavos,
+          valor_a_pagar: ag.preco_centavos - (ag.valor_coberto_centavos ?? 0), // < preço quando o plano do cliente cobre o serviço
           expira_em: ag.expira_em,
           profissional: prof?.nome ?? null,
           token: ag.token_publico, // autoriza pagar/gerenciar este agendamento sem login

@@ -48,6 +48,7 @@ async function validarCobranca(t: Executor, ag: Agendamento) {
   if (!["confirmado", "pendente_pagamento"].includes(ag.status)) throw new ErroNegocio("Agendamento não está aberto para pagamento");
   const [pago] = await t.query(`select 1 from pagamento where agendamento_id = $1 and status = 'pago'`, [ag.id]);
   if (pago) throw new ErroNegocio("Este agendamento já foi pago");
+  if (ag.preco_centavos - (ag.valor_coberto_centavos ?? 0) <= 0) throw new ErroNegocio("Este atendimento está incluído no plano: não há valor a pagar");
   return cfg;
 }
 
@@ -63,7 +64,7 @@ export async function criarCobrancaPix(agendamentoId: string, tipoPedido: string
     const ag = await agendamentoAutorizado(t, agendamentoId, auth);
     const cfg = await validarCobranca(t, ag);
     const tipo = tipoPermitido(cfg.pagamento_tipo, tipoPedido);
-    const valor = valorCobranca(ag.preco_centavos, tipo, cfg);
+    const valor = valorCobranca(ag.preco_centavos - (ag.valor_coberto_centavos ?? 0), tipo, cfg);
     await t.query(`update pagamento set status = 'cancelado' where agendamento_id = $1 and status = 'pendente'`, [ag.id]);
     const ref = tokenAleatorio(8).toUpperCase();
     // Agendamento pendente: o prazo do Pix nunca passa do prazo de reserva já definido.
@@ -200,7 +201,7 @@ export async function pagarComCartao(agendamentoId: string, cartaoId: string, ti
     const [cartao] = await t.query<{ ultimos4: string }>(`select ultimos4 from cartao where id = $1 and cliente_id = $2`, [cartaoId, clienteId]);
     if (!cartao) throw new ErroNegocio("Cartão não encontrado", 404);
     const tipo = tipoPermitido(cfg.pagamento_tipo, tipoPedido);
-    const valor = valorCobranca(ag.preco_centavos, tipo, cfg);
+    const valor = valorCobranca(ag.preco_centavos - (ag.valor_coberto_centavos ?? 0), tipo, cfg);
     await t.query(`update pagamento set status = 'cancelado' where agendamento_id = $1 and status = 'pendente'`, [ag.id]);
     const [p] = await t.query<{ id: string }>(
       `insert into pagamento (agendamento_id, metodo, tipo, valor_centavos, status, provedor_ref)

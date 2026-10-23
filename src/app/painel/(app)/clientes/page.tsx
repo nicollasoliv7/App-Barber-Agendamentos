@@ -5,6 +5,8 @@ import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 import { Icone, Vazio } from "@/components/ui";
 import { novoCliente } from "../../acoes";
+import { RECORRENTE_VISITAS } from "@/lib/relatorios";
+import { usaPlanos } from "@/lib/planos";
 import { Cabecalho, Campo, Form } from "../../Form";
 
 export const metadata = { title: "Clientes" };
@@ -22,14 +24,19 @@ type C = {
   ultimo: Date | null;
   proximo: Date | null;
   criado_em: Date;
+  recentes: number;
+  plano: string | null;
+  plano_status: string | null;
 };
 
 const SEGMENTOS = [
   ["todos", "Todos"],
   ["proximo", "Com horário marcado"],
   ["sumidos", "Sem visita há 45+ dias"],
+  ["recorrentes", "Recorrentes"],
   ["novos", "Novos (30 dias)"],
   ["importados", "Importados"],
+  ["assinantes", "Com plano"],
 ] as const;
 const ORDENS = [
   ["recentes", "Última visita"],
@@ -43,7 +50,9 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
   const sp = await searchParams;
   const v = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
   const busca = v("q").trim().slice(0, 80);
-  const seg = SEGMENTOS.some(([k]) => k === v("seg")) ? v("seg") : "todos";
+  const comPlanos = await usaPlanos(u.empresa_id);
+  const segmentos = SEGMENTOS.filter(([k]) => k !== "assinantes" || comPlanos); // "Com plano" só para quem usa planos
+  const seg = segmentos.some(([k]) => k === v("seg")) ? v("seg") : "todos";
   const ordem = ORDENS.some(([k]) => k === v("ordem")) ? v("ordem") : "recentes";
   const pagina = Math.max(0, Number(v("pagina")) || 0);
   const filtroSeg: Record<string, string> = {
@@ -52,6 +61,8 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
     sumidos: "ultimo < now() - interval '45 days' and proximo is null",
     novos: "criado_em >= now() - interval '30 days'",
     importados: "origem = 'importacao'",
+    recorrentes: `recentes >= ${RECORRENTE_VISITAS}`,
+    assinantes: "plano is not null",
   };
   const ordemSql: Record<string, string> = {
     recentes: "ultimo desc nulls last, nome",
@@ -66,7 +77,10 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
          select c.id, c.nome, c.telefone, c.email, c.origem, c.criado_em,
                 count(a.id) filter (where a.status = 'concluido')::int as visitas,
                 count(a.id) filter (where a.status = 'faltou')::int as faltas,
-                coalesce(sum(a.preco_centavos) filter (where a.status = 'concluido'),0)::int as gasto,
+                coalesce(sum(a.preco_centavos - a.valor_coberto_centavos) filter (where a.status = 'concluido'),0)::int as gasto,
+                count(a.id) filter (where a.status = 'concluido' and a.inicio >= now() - interval '90 days' and a.inicio <= now())::int as recentes,
+                (select p.nome from assinatura s join plano p on p.id = s.plano_id where s.cliente_id = c.id and s.status <> 'cancelada' limit 1) as plano,
+                (select s.status from assinatura s where s.cliente_id = c.id and s.status <> 'cancelada' limit 1) as plano_status,
                 max(a.inicio) filter (where a.inicio < now() and a.status in ('concluido','confirmado')) as ultimo,
                 min(a.inicio) filter (where a.inicio >= now() and a.status in ('confirmado','pendente_pagamento')) as proximo
          from cliente c left join agendamento a on a.cliente_id = c.id
@@ -110,7 +124,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
           <button className="btn btn-sutil">Buscar</button>
         </form>
         <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Segmentos">
-          {SEGMENTOS.map(([k, r]) => (
+          {segmentos.map(([k, r]) => (
             <Link key={k} href={link({ seg: k })} data-ativo={seg === k} className="chip !py-1.5 !text-[13px]">
               {r}
             </Link>
@@ -153,6 +167,16 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
                       {formatarTelefone(c.telefone)}
                       {c.email ? ` · ${c.email}` : ""}
                     </div>
+                    {(c.plano || c.recentes >= RECORRENTE_VISITAS) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {c.plano && (
+                          <span className={`badge ${c.plano_status === "ativa" ? "badge-ok" : "badge-warn"}`} title={`Plano ${c.plano_status}`}>
+                            {c.plano}
+                          </span>
+                        )}
+                        {c.recentes >= RECORRENTE_VISITAS && <span className="badge badge-neutro">Recorrente</span>}
+                      </div>
+                    )}
                   </td>
                   <td className="text-right num">
                     {c.visitas}

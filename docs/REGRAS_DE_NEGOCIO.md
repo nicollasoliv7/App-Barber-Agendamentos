@@ -82,3 +82,30 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
 - **R54 · Status honesto** — `nao_enviado` (sem conexão, conexão com erro ou sem modelo), `aceito` (a Meta aceitou), `enviado`/`entregue`/`lido`/`falhou` (somente via webhook com assinatura válida). O status nunca regride. Um evento só altera mensagens da empresa dona do número que o gerou. Token recusado pela Meta coloca a conexão em `erro`, e os envios param até "Testar conexão" ou reconectar.
 - **R55 · Envio manual** — Sem integração, o painel (Agenda, Agendamentos, Notificações) oferece o botão que abre o WhatsApp do barbeiro com a mensagem pronta (`wa.me`), e a página pública oferece "Avisar a barbearia pelo WhatsApp". Esses envios **não** são marcados como enviados.
 - **R56 · Envio após o commit** — A chamada à Meta acontece depois que a transação do agendamento é gravada; uma falha no WhatsApp nunca desfaz nem bloqueia o agendamento.
+
+## 11. Planos mensais — módulo opcional (v5)
+Princípio: barbearias que cobram só por corte, só por mensalidade ou pelos dois usam o sistema normalmente. Sem planos cadastrados, nada desse módulo aparece no painel além do item "Planos" no menu.
+
+- **R57 · Plano** — Nome, preço, período (mensal, trimestral, semestral ou anual), serviços incluídos e outros benefícios em texto. Cada serviço incluído tem um **limite de usos por ciclo** (vazio = sem limite) e um **valor que o cliente ainda paga** por uso (0 = 100% coberto). Plano inativo não aceita novas assinaturas; as atuais continuam.
+- **R58 · Assinatura** — No máximo **uma** assinatura em andamento por cliente. A assinatura guarda **preço e período do momento da adesão**: mudar o plano não altera assinaturas nem cobranças anteriores. Mudanças nos serviços incluídos e limites valem daí em diante; usos já registrados não mudam. Cliente e plano precisam ser da mesma barbearia (validação no servidor + chaves compostas no Supabase).
+- **R59 · Ciclos e mensalidades** — Os ciclos são contados a partir da data de início (31/01 + 1 mês = 28/02, sem "deriva"). Cada ciclo tem **uma** mensalidade (`unique (assinatura, ciclo)`), com vencimento no início do ciclo. Ativar um plano **não cria pagamento**: cria uma mensalidade *pendente*, a menos que o barbeiro marque "já recebi". Registrar pagamento só funciona em mensalidade pendente (não duplica). Um registro feito por engano pode ser desfeito pelo gestor. Os ciclos avançam sozinhos ao abrir as telas (sem rotina externa).
+- **R60 · Status da assinatura** (separado do status da mensalidade):
+  - *pendente*: nenhuma mensalidade paga;
+  - *ativa*: em dia ou renovação dentro da tolerância;
+  - *inadimplente*: alguma mensalidade vencida há mais de **5 dias**;
+  - *cancelada*: manual e definitiva; as mensalidades pendentes são canceladas e as pagas ficam.
+- **R61 · Cobertura** — Um atendimento é coberto quando:
+  - a assinatura do cliente está **ativa**;
+  - o serviço está no plano;
+  - a data cai no **ciclo atual**;
+  - ainda há saldo de usos no ciclo.
+  
+  O uso do benefício (`assinatura_uso`, no máximo 1 por atendimento) é registrado **automaticamente ao agendar** (página pública ou painel). O barbeiro pode registrar depois ("Usar plano") ou desfazer ("Cobrar avulso"). Não dá para usar o plano num atendimento que já tem pagamento registrado.
+- **R62 · Sem cobrança duplicada** — O preço do atendimento continua o do serviço. A parte coberta fica em `agendamento.valor_coberto_centavos`, e o cliente deve só `preço − coberto` (o adicional, se houver):
+  - "Recebi no local" e o Pix cobram apenas esse saldo;
+  - com Pix obrigatório, um atendimento 100% coberto é confirmado sem Pix.
+- **R63 · Cancelamento e remarcação** — Cancelar o atendimento devolve o uso ao ciclo. Remarcar recalcula a cobertura, porque a nova data pode cair em outro ciclo. Cancelar a assinatura tira a cobertura dos atendimentos **futuros**; os passados continuam como estavam.
+- **R64 · Financeiro** — Receita de **atendimentos** = valor não coberto dos atendimentos concluídos. Receita de **planos** = mensalidades pagas. O uso de benefício **não é receita**: aparece como "atendimentos cobertos". "A receber" = saldo dos atendimentos concluídos + mensalidades pendentes. Comissões continuam sobre o valor do serviço realizado (inclusive os cobertos). Ticket médio considera só atendimentos com valor a receber.
+- **R65 · Cliente recorrente** — 3 ou mais atendimentos concluídos nos últimos 90 dias, **com ou sem plano**. Aparece no CRM (segmento e selo) e no dashboard.
+- **R66 · Sem gateway** — Não existe cobrança automática de mensalidade: os pagamentos são registrados pelo barbeiro (Pix, dinheiro, cartão, transferência, outro). A cobrança recorrente automática depende de um gateway e de credenciais externas.
+- **R67 · Editar agendamento pelo painel** — Data, hora, profissional e observação de agendamentos em aberto. A edição respeita expediente, folgas e conflitos (ignora a antecedência mínima), avisa o cliente sobre a remarcação e recalcula a cobertura do plano.

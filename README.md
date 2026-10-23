@@ -1,10 +1,13 @@
 # Agendou
 
+**Tudo o que sua barbearia precisa para funcionar melhor.** Gestão completa para barbearias, em dois pilares: (1) **gestão essencial** — agenda, clientes, atendimentos e financeiro para qualquer barbearia; (2) **crescimento e recorrência** — planos mensais opcionais, integrados à agenda e ao financeiro.
+
 SaaS de agendamento para barbearias: **agendamento público sem login** (link para Instagram/WhatsApp), **CRM** com dashboard e filtros, **importação de clientes** de outros sistemas (CSV/Excel) e painel do dono. Visual escuro premium com aurora quente.
 
 | Funciona de verdade | Depende de configuração externa |
 |---|---|
 | Agendamento público, "sem preferência", remarcar/cancelar pelo link, `.ics` | WhatsApp automático: cada barbearia conecta o próprio número na API oficial da Meta ([docs/WHATSAPP.md](docs/WHATSAPP.md)). Sem isso, há envio manual pelo WhatsApp do barbeiro |
+| Planos mensais (opcional): planos, assinaturas, mensalidades, uso de benefício na agenda sem cobrança duplicada | Cobrança automática de mensalidade (hoje o pagamento é registrado pelo barbeiro; depende de gateway) |
 | Painel, CRM, relatórios, exportação CSV | Pagamento real (hoje só sandbox: nenhum valor é cobrado) |
 | Importação CSV/Excel com validação e duplicados | Integrações de importação por API (estrutura pronta, nenhum conector) |
 | Banco embutido ou Supabase com RLS | Link absoluto nas mensagens (`APP_URL`) |

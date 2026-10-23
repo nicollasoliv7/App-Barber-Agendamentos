@@ -283,3 +283,81 @@ update notificacao set status = 'nao_enviado', erro = 'Registrada antes da integ
  where status = 'enviado' and provedor_msg_id is null and tipo is null;
 alter table notificacao add constraint notificacao_status_check
   check (status in ('pendente','nao_enviado','aceito','enviado','entregue','lido','falhou'));
+
+-- v5: planos mensais (módulo opcional). Nada aqui é obrigatório para usar a agenda e o financeiro.
+create table if not exists plano (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  nome text not null check (length(trim(nome)) between 2 and 80),
+  descricao text,
+  beneficios text,                                   -- benefícios extras em texto (ex.: 10% em produtos)
+  preco_centavos int not null check (preco_centavos > 0),
+  periodo_meses int not null default 1 check (periodo_meses in (1,3,6,12)),
+  ativo boolean not null default true,               -- inativo: não aceita novas assinaturas; as atuais continuam
+  criado_em timestamptz not null default now()
+);
+create index if not exists plano_empresa on plano (empresa_id);
+
+-- serviços incluídos: limite de usos por ciclo (null = sem limite) e quanto o cliente ainda paga por uso (0 = 100% coberto)
+create table if not exists plano_servico (
+  plano_id uuid not null references plano(id) on delete cascade,
+  servico_id uuid not null references servico(id) on delete cascade,
+  limite_por_ciclo int check (limite_por_ciclo is null or limite_por_ciclo between 1 and 100),
+  valor_cliente_centavos int not null default 0 check (valor_cliente_centavos >= 0),
+  primary key (plano_id, servico_id)
+);
+
+-- a assinatura guarda preço e período do momento da adesão: mudar o plano não altera o que já foi combinado
+create table if not exists assinatura (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  cliente_id uuid not null references cliente(id) on delete cascade,
+  plano_id uuid not null references plano(id),
+  status text not null default 'pendente' check (status in ('pendente','ativa','inadimplente','cancelada')),
+  inicio date not null,
+  preco_centavos int not null check (preco_centavos > 0),
+  periodo_meses int not null check (periodo_meses in (1,3,6,12)),
+  ciclo_inicio date not null,                        -- início do ciclo atual
+  ciclo_fim date not null,                           -- fim (exclusivo) do ciclo atual = próxima renovação
+  cancelada_em timestamptz,
+  motivo_cancelamento text,
+  criado_em timestamptz not null default now()
+);
+create index if not exists assinatura_empresa on assinatura (empresa_id, status);
+-- no máximo UMA assinatura em andamento por cliente
+create unique index if not exists assinatura_cliente_aberta on assinatura (cliente_id) where status <> 'cancelada';
+
+-- cobrança da mensalidade: uma por ciclo. Status da COBRANÇA ≠ status da ASSINATURA.
+create table if not exists assinatura_cobranca (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  assinatura_id uuid not null references assinatura(id) on delete cascade,
+  ciclo_inicio date not null,
+  ciclo_fim date not null,
+  vencimento date not null,
+  valor_centavos int not null check (valor_centavos > 0),
+  status text not null default 'pendente' check (status in ('pendente','paga','cancelada')),
+  metodo text check (metodo in ('pix','dinheiro','cartao','transferencia','outro')),
+  pago_em timestamptz,
+  registrado_por uuid references usuario_painel(id) on delete set null,
+  criado_em timestamptz not null default now(),
+  unique (assinatura_id, ciclo_inicio),
+  check ((status = 'paga') = (pago_em is not null))
+);
+create index if not exists assinatura_cobranca_empresa on assinatura_cobranca (empresa_id, status, vencimento);
+
+-- uso do benefício: um atendimento coberto pelo plano. Não é pagamento nem receita.
+create table if not exists assinatura_uso (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  assinatura_id uuid not null references assinatura(id) on delete cascade,
+  agendamento_id uuid not null unique references agendamento(id) on delete cascade,   -- 1 uso por atendimento
+  servico_id uuid not null references servico(id),
+  ciclo_inicio date not null,
+  valor_coberto_centavos int not null check (valor_coberto_centavos >= 0),
+  criado_em timestamptz not null default now()
+);
+create index if not exists assinatura_uso_ciclo on assinatura_uso (assinatura_id, ciclo_inicio);
+
+-- parte do preço do atendimento coberta pelo plano (0 = atendimento avulso). Mantida junto com assinatura_uso.
+alter table agendamento add column if not exists valor_coberto_centavos int not null default 0;

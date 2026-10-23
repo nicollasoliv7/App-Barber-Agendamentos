@@ -23,3 +23,11 @@ WHATSAPP_APP_SECRET=segredo-do-app-de-teste WHATSAPP_WEBHOOK_VERIFY_TOKEN=verifi
 APP_URL=http://localhost:3300 PORT=3300 MODO_DEMO=1 LEMBRETE_HORAS_ANTES=72 CRON_SECRET=cron-teste npm run dev
 CRON_SECRET=cron-teste node e2e/whatsapp.mjs     # 42 verificações
 ```
+
+## Planos mensais (49 verificações)
+
+Com o app rodando num banco **novo** e a 2ª barbearia criada (`node e2e/outra-barbearia.mjs`, com o app parado):
+
+```bash
+node e2e/planos.mjs   # barbearia só por corte, CRM, criar plano, assinante coberto, limite, adicional, pendente/atrasada/cancelada, financeiro, isolamento
+```

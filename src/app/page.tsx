@@ -17,14 +17,17 @@ export default async function Home() {
             <Logo className="text-[15px]" />
           </Link>
           <div className="hidden items-center gap-6 text-sm font-medium text-[#9c9c9d] md:flex">
-            <a href="#agendamento" className="hover:text-white">
-              Agendamento
+            <a href="#agenda" className="hover:text-white">
+              Agenda
             </a>
-            <a href="#crm" className="hover:text-white">
-              CRM
+            <a href="#clientes" className="hover:text-white">
+              Clientes
             </a>
-            <a href="#migracao" className="hover:text-white">
-              Migração
+            <a href="#financeiro" className="hover:text-white">
+              Financeiro
+            </a>
+            <a href="#planos" className="hover:text-white">
+              Planos
             </a>
           </div>
           <div className="flex items-center gap-2">
@@ -39,13 +42,13 @@ export default async function Home() {
 
         <div className="relative z-10 mt-16 flex max-w-3xl flex-col items-center text-center md:mt-24">
           <span className="eyebrow surgir">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--coral)]" /> Agenda online + CRM para barbearias
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--coral)]" /> Gestão completa para barbearias
           </span>
           <h1 className="surgir mt-6 text-[40px] font-semibold leading-[1.08] tracking-[-0.02em] text-white sm:text-[52px] md:!text-[64px]" style={{ animationDelay: "60ms" }}>
-            Sua barbearia com a agenda <span className="texto-quente">cheia</span>, sem trabalho manual.
+            Tudo o que sua barbearia precisa para <span className="texto-quente">funcionar melhor</span>.
           </h1>
           <p className="surgir mt-5 max-w-[640px] text-[17px] leading-relaxed tracking-[0.2px] text-white/70 md:text-lg" style={{ animationDelay: "120ms" }}>
-            Um link para o Instagram e o WhatsApp: o cliente escolhe serviço, barbeiro e horário em segundos, sem cadastro. Você acompanha tudo num painel simples.
+            Gerencie agendamentos, clientes e pagamentos em um só lugar. Organize sua rotina, acompanhe seu faturamento e fidelize seus clientes.
           </p>
           <div className="surgir mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row" style={{ animationDelay: "180ms" }}>
             <Link href={demo} className="btn btn-key !px-5 !py-3">
@@ -93,30 +96,36 @@ export default async function Home() {
           </div>
         </div>
 
-        <a href="#agendamento" className="btn btn-ghost relative z-10 mt-10">
+        <a href="#agenda" className="btn btn-ghost relative z-10 mt-10">
           Como funciona ↓
         </a>
       </section>
 
-      <section className="relative mx-auto grid max-w-5xl gap-4 px-4 pb-24 md:grid-cols-3">
+      <section className="relative mx-auto grid max-w-6xl gap-4 px-4 pb-6 md:grid-cols-2 lg:grid-cols-4">
         {[
           {
-            id: "agendamento",
+            id: "agenda",
             icone: "calendario" as const,
-            titulo: "Agendamento sem login",
-            texto: "Página pública mobile-first com serviço, barbeiro (ou “sem preferência”), dia e horário. O cliente remarca ou cancela pelo próprio link.",
+            titulo: "Agenda e agendamento online",
+            texto: "Agenda do dia por barbeiro e um link para o Instagram e o WhatsApp: o cliente escolhe serviço, barbeiro e horário sem cadastro, e remarca pelo próprio link.",
           },
           {
-            id: "crm",
-            icone: "grafico" as const,
-            titulo: "CRM e números claros",
-            texto: "Faturamento, ticket médio, serviços mais pedidos, clientes sumidos e histórico de cada cliente, com filtros por período, serviço e status.",
+            id: "clientes",
+            icone: "usuarios" as const,
+            titulo: "Clientes e histórico",
+            texto: "Ficha de cada cliente com histórico de atendimentos, frequência e preferências. Identifique quem é recorrente e quem sumiu. Traga sua base de outro sistema em CSV ou Excel.",
           },
           {
-            id: "migracao",
-            icone: "upload" as const,
-            titulo: "Migração em minutos",
-            texto: "Importe sua base de outro sistema em CSV ou Excel, com mapeamento de colunas, prévia, duplicados e relatório de erros antes de confirmar.",
+            id: "financeiro",
+            icone: "dinheiro" as const,
+            titulo: "Financeiro sem planilha",
+            texto: "Pagamentos registrados, valores a receber, faturamento por período, ticket médio e comissões, tudo a partir da agenda.",
+          },
+          {
+            id: "planos",
+            icone: "recorrente" as const,
+            titulo: "Planos mensais (opcional)",
+            texto: "Transforme clientes frequentes em clientes recorrentes com planos mensais personalizados e tenha mais previsibilidade de faturamento. Use só se fizer sentido para você.",
           },
         ].map((c) => (
           <article key={c.id} id={c.id} className="card scroll-mt-8 p-6">
@@ -129,9 +138,13 @@ export default async function Home() {
         ))}
       </section>
 
+      <p className="mx-auto max-w-2xl px-4 pb-24 pt-6 text-center text-sm text-white/55">
+        Atende só por corte? Funciona. Trabalha com mensalidades? Também. Os dois juntos? Tudo integrado na mesma agenda e no mesmo financeiro.
+      </p>
+
       <footer className="border-t border-white/[0.06] px-4 py-8 text-center text-xs text-[#9c9c9d]">
         <Logo className="text-sm text-white" />
-        <p className="mt-2">Agenda online, CRM e migração de clientes para barbearias.</p>
+        <p className="mt-2">Gestão completa para barbearias: agenda, clientes, financeiro e planos mensais.</p>
       </footer>
     </div>
   );

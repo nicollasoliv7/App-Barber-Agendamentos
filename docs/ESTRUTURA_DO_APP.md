@@ -90,6 +90,7 @@ A página pública usa a mesma base, mas a cor de ação e a aurora vêm do **te
 | `/painel/horarios` | dono | B6 |
 | `/painel/bloqueios` | dono | B7 |
 | `/painel/financeiro` | dono | B8, B9, B10 |
+| `/painel/planos` | dono/admin edita; equipe consulta | Planos mensais (opcional): planos, assinantes, renovações, indicadores (v5) |
 | `/painel/whatsapp` | dono/admin | Conectar número, modelos, teste, webhook, desconectar (v4) |
 | `/painel/notificacoes` | dono | B14 — com status real e botão de envio manual |
 | `/painel/configuracoes` | dono | B11, B12, B13, B15 (+ campos personalizados, cadastro de unidades) |
@@ -130,6 +131,8 @@ A página pública usa a mesma base, mas a cor de ação e a aurora vêm do **te
 | POST | `/{id}/simular` | aprova (só no sandbox) |
 | POST | `/{id}/cancelar` | cancela a cobrança e, se o pagamento era obrigatório, o agendamento |
 | POST | `/cartao` | paga com cartão salvo (o final 0002 é recusado) |
+
+**Planos (v5)**: ações em `src/app/painel/acoes-planos.ts` (salvar plano, ativar assinatura, registrar/desfazer mensalidade, cancelar assinatura, usar plano / cobrar avulso, editar agendamento). Regras em `src/lib/planos.ts` (ciclos, status, cobertura, indicadores). Bloco "Plano mensal" na ficha do cliente: `clientes/[id]/PlanoDoCliente.tsx`.
 
 **WhatsApp**: `GET/POST /api/whatsapp/webhook` (verificação da Meta e status de entrega, com assinatura `X-Hub-Signature-256`). Ações do painel em `src/app/painel/acoes-whatsapp.ts`; núcleo em `src/lib/whatsapp.ts` e `src/lib/notificacoes.ts`.
 

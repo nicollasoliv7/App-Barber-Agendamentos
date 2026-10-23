@@ -9,6 +9,9 @@ import { estornarPagamentos, mudarStatus, novoAgendamentoManual, registrarPagame
 import { Cabecalho, Campo, Form, inp } from "../../Form";
 import { Icone, StatusBadge } from "@/components/ui";
 import { linkGerenciar } from "@/lib/agendamentos";
+import { tx } from "@/lib/db";
+import { avaliarCobertura, type Cobertura } from "@/lib/planos";
+import { cobrarAvulsoAcao, editarAgendamentoAcao, usarPlanoAcao } from "../../acoes-planos";
 import { linkWhatsapp, textoConfirmacao } from "@/lib/mensagens";
 
 export const metadata = { title: "Agenda" };
@@ -30,6 +33,13 @@ type Linha = {
   pago: number;
   cancelado_por: string | null;
   token_publico: string;
+  valor_coberto_centavos: number;
+  cliente_id: string;
+  servico_id: string;
+  empresa_id: string;
+  observacao: string | null;
+  tem_plano: boolean;
+  plano: string | null;
 };
 
 export default async function Agenda({ searchParams }: PageProps<"/painel/agenda">) {
@@ -49,7 +59,9 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
       [u.empresa_id],
     ),
     q<Linha>(
-      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por, a.token_publico,
+      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por, a.token_publico, a.valor_coberto_centavos, a.cliente_id, a.servico_id, a.empresa_id, a.observacao,
+              exists (select 1 from assinatura s where s.cliente_id = a.cliente_id and s.status <> 'cancelada') as tem_plano,
+              (select p.nome from assinatura_uso us join assinatura s on s.id = us.assinatura_id join plano p on p.id = s.plano_id where us.agendamento_id = a.id) as plano,
               c.nome as cliente, c.telefone, s.nome as servico,
               coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
        from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
@@ -62,8 +74,16 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
     ),
   ]);
 
+  // planos (módulo opcional): só consulta para clientes que têm assinatura
+  const elegiveis = new Map<string, Cobertura>();
+  const candidatos = ags.filter((a) => a.tem_plano && a.valor_coberto_centavos === 0 && a.pago === 0 && ["confirmado", "concluido"].includes(a.status));
+  if (candidatos.length)
+    await tx(async (t) => {
+      for (const a of candidatos) elegiveis.set(a.id, await avaliarCobertura(t, a));
+    });
+
   const ativos = ags.filter((a) => a.status !== "cancelado");
-  const previsto = ativos.filter((a) => a.status !== "faltou").reduce((s, a) => s + a.preco_centavos, 0);
+  const previsto = ativos.filter((a) => a.status !== "faltou").reduce((s, a) => s + a.preco_centavos - a.valor_coberto_centavos, 0); // sem a parte coberta por plano
   const recebido = ags.reduce((s, a) => s + a.pago, 0);
   const hm = (d: Date) => hhmm(minutosLocal(new Date(d), cfg.fuso_horario));
 
@@ -101,7 +121,7 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
           const lista = ags.filter((a) => a.profissional_id === p.id);
           const bls = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === p.id);
           return (
-            <div key={p.id} className="card p-4">
+            <div key={p.id} className="card min-w-0 p-4">
               <h2 className="mb-3 flex items-center justify-between font-medium">
                 <span className="flex items-center gap-2">
                   <Icone nome="pessoa" tamanho={15} className="muted" /> {p.nome}
@@ -116,7 +136,7 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
               {lista.length === 0 && <p className="py-6 text-center text-sm muted">Nenhum agendamento.</p>}
               <ul className="grid gap-2">
                 {lista.map((a) => (
-                  <li key={a.id} className={`rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-sm ${a.status === "cancelado" ? "opacity-55" : ""}`}>
+                  <li key={a.id} className={`min-w-0 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-sm ${a.status === "cancelado" ? "opacity-55" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-medium">
@@ -136,6 +156,17 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
                           {a.pago > 0 && ` · pago ${reais(a.pago)}`}
                           {a.origem === "painel" && " · manual"}
                         </div>
+                        {a.valor_coberto_centavos > 0 && (
+                          <div className="mt-1 text-xs text-[#7ee2b0]">
+                            Plano{a.plano ? ` ${a.plano}` : ""}:{" "}
+                            {a.valor_coberto_centavos >= a.preco_centavos
+                              ? "coberto, sem cobrança"
+                              : `cobre ${reais(a.valor_coberto_centavos)}, cliente paga ${reais(a.preco_centavos - a.valor_coberto_centavos)}`}
+                          </div>
+                        )}
+                        {elegiveis.get(a.id) && !elegiveis.get(a.id)!.elegivel && elegiveis.get(a.id)!.motivo !== "Cliente sem plano" && (
+                          <div className="mt-1 text-xs faint">Plano: {elegiveis.get(a.id)!.motivo}</div>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         <StatusBadge status={a.status} />
@@ -188,13 +219,55 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
                             <button className="btn btn-sutil btn-sm">Confirmar</button>
                           </form>
                         )}
-                        {a.pago < a.preco_centavos && (
+                        {elegiveis.get(a.id)?.elegivel && (
+                          <form action={usarPlanoAcao}>
+                            <input type="hidden" name="id" value={a.id} />
+                            <button className="btn btn-sutil btn-sm" title={`Registrar o uso do plano ${elegiveis.get(a.id)!.plano}`}>
+                              Usar plano
+                            </button>
+                          </form>
+                        )}
+                        {a.valor_coberto_centavos > 0 && (
+                          <form action={cobrarAvulsoAcao}>
+                            <input type="hidden" name="id" value={a.id} />
+                            <button className="btn btn-sutil btn-sm" title="Desfaz o uso do plano neste atendimento">
+                              Cobrar avulso
+                            </button>
+                          </form>
+                        )}
+                        {a.pago < a.preco_centavos - a.valor_coberto_centavos && (
                           <form action={registrarPagamentoLocal}>
                             <input type="hidden" name="id" value={a.id} />
                             <button className="btn btn-sutil btn-sm">Recebi no local</button>
                           </form>
                         )}
                       </div>
+                    )}
+                    {(a.status === "confirmado" || a.status === "pendente_pagamento") && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs muted">Editar</summary>
+                        <Form action={editarAgendamentoAcao} botao="Salvar alterações" className="mt-2 grid grid-cols-2 gap-2 [&_input]:min-w-0 [&_select]:min-w-0">
+                          <input type="hidden" name="id" value={a.id} />
+                          <Campo rotulo="Dia">
+                            <input type="date" name="dia" defaultValue={dia} required className={inp} />
+                          </Campo>
+                          <Campo rotulo="Hora">
+                            <input type="time" name="hora" defaultValue={hm(a.inicio)} step={300} required className={inp} />
+                          </Campo>
+                          <Campo rotulo="Profissional" className="col-span-2">
+                            <select name="profissional" defaultValue={a.profissional_id} className={inp}>
+                              {profs.map((pp) => (
+                                <option key={pp.id} value={pp.id}>
+                                  {pp.nome}
+                                </option>
+                              ))}
+                            </select>
+                          </Campo>
+                          <Campo rotulo="Observação" className="col-span-2">
+                            <input name="observacao" defaultValue={a.observacao ?? ""} maxLength={500} className={inp} />
+                          </Campo>
+                        </Form>
+                      </details>
                     )}
                   </li>
                 ))}

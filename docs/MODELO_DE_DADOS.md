@@ -29,6 +29,13 @@ erDiagram
   USUARIO_PAINEL ||--o{ SESSAO : "acessa via"
   AGENDAMENTO ||--o{ NOTIFICACAO : gera
   EMPRESA ||--o| WHATSAPP_CONEXAO : "envia por"
+  EMPRESA ||--o{ PLANO : oferece
+  PLANO }o--o{ SERVICO : "inclui (PLANO_SERVICO)"
+  CLIENTE ||--o{ ASSINATURA : assina
+  PLANO ||--o{ ASSINATURA : "é assinado em"
+  ASSINATURA ||--o{ ASSINATURA_COBRANCA : "cobra por ciclo"
+  ASSINATURA ||--o{ ASSINATURA_USO : "é usada em"
+  AGENDAMENTO ||--o| ASSINATURA_USO : "coberto por"
   CLIENTE ||--o{ CODIGO_VERIFICACAO : recebe
   EMPRESA ||--o{ IMPORTACAO : registra
   IMPORTACAO ||--o{ CLIENTE : "trouxe"
@@ -141,3 +148,21 @@ id, empresa_id, usuario_id, fonte (`arquivo`; futuramente o id do conector de AP
 
 ### cliente: colunas novas (v3)
 `observacoes` (anotações da equipe), `origem` (`agendamento` | `painel` | `importacao`), `importacao_id`.
+
+### plano (v5 · módulo opcional)
+id, empresa_id, nome, descricao, beneficios (texto livre), preco_centavos, periodo_meses (1, 3, 6 ou 12), ativo, criado_em.
+
+### plano_servico
+plano_id, servico_id (PK composta), limite_por_ciclo (null = sem limite), valor_cliente_centavos (adicional pago pelo cliente por uso; 0 = 100% coberto).
+
+### assinatura
+id, empresa_id, cliente_id, plano_id, status (`pendente` \| `ativa` \| `inadimplente` \| `cancelada`), inicio, **preco_centavos e periodo_meses congelados na adesão**, ciclo_inicio, ciclo_fim (= próxima renovação), cancelada_em, motivo_cancelamento, criado_em. Índice único parcial: uma assinatura não cancelada por cliente.
+
+### assinatura_cobranca (mensalidade)
+id, empresa_id, assinatura_id, ciclo_inicio, ciclo_fim, vencimento, valor_centavos, status (`pendente` \| `paga` \| `cancelada`), metodo (`pix` \| `dinheiro` \| `cartao` \| `transferencia` \| `outro`), pago_em, registrado_por, criado_em. UNIQUE (assinatura_id, ciclo_inicio): uma por ciclo.
+
+### assinatura_uso (uso do benefício — não é pagamento)
+id, empresa_id, assinatura_id, **agendamento_id UNIQUE**, servico_id, ciclo_inicio, valor_coberto_centavos, criado_em.
+
+### agendamento: coluna nova (v5)
+`valor_coberto_centavos` — parte do preço coberta pelo plano (0 = avulso). O cliente deve `preco_centavos − valor_coberto_centavos`.

@@ -28,6 +28,8 @@ type Criado = {
   inicio: string;
   fim: string;
   preco_centavos: number;
+  /** quanto o cliente paga (menor que o preço quando o plano mensal dele cobre o serviço) */
+  valor_a_pagar?: number;
   profissional: string | null;
   token: string;
   gerenciar: string;
@@ -249,7 +251,12 @@ export default function Agendar(p: Props) {
               ["Serviço", servico.nome],
               ["Profissional", criado.profissional ?? prof?.nome ?? ""],
               ["Quando", `${dia ? diaLongo(dia) : ""} às ${hora}`],
-              ["Valor", reais(criado.preco_centavos) + (pago ? " · pago" : "")],
+              [
+                "Valor",
+                criado.valor_a_pagar === 0
+                  ? "Incluído no seu plano"
+                  : reais(criado.valor_a_pagar ?? criado.preco_centavos) + (criado.valor_a_pagar !== undefined && criado.valor_a_pagar < criado.preco_centavos ? " (com seu plano)" : "") + (pago ? " · pago" : ""),
+              ],
               ...(p.endereco ? [["Onde", p.endereco]] : []),
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 px-5 py-3">
@@ -307,11 +314,11 @@ export default function Agendar(p: Props) {
           </div>
         </div>
 
-        {!pago && p.pagamento.modo === "opcional" && (
+        {!pago && p.pagamento.modo === "opcional" && criado.valor_a_pagar !== 0 && (
           <div className="card mt-4 p-4">
             <p className="text-sm font-medium">Quer adiantar o pagamento?</p>
             <p className="mb-3 text-xs suave">Opcional. Você também pode pagar na barbearia.</p>
-            <Pagamento agendamentoId={criado.id} token={criado.token} preco={criado.preco_centavos} cfg={p.pagamento} obrigatorio={false} onPago={() => setPago(true)} onCancelado={() => {}} />
+            <Pagamento agendamentoId={criado.id} token={criado.token} preco={criado.valor_a_pagar ?? criado.preco_centavos} cfg={p.pagamento} obrigatorio={false} onPago={() => setPago(true)} onCancelado={() => {}} />
           </div>
         )}
 

@@ -6,7 +6,9 @@ import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
 import { dashboard, filtrosParaQuery, lerFiltros } from "@/lib/relatorios";
 import { origemApp } from "@/lib/origem";
-import { formatarDataHora, reais } from "@/lib/tempo";
+import { resumoPlanos, usaPlanos } from "@/lib/planos";
+import { RECORRENTE_VISITAS } from "@/lib/relatorios";
+import { formatarDataHora, instanteLocal, reais, somarDias } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 import { Icone, Kpi, StatusBadge } from "@/components/ui";
 import { Cabecalho } from "../Form";
@@ -30,6 +32,10 @@ export default async function VisaoGeral({ searchParams }: PageProps<"/painel">)
     origemApp(),
     q<{ total_clientes: number }>(`select count(*)::int as total_clientes from cliente where empresa_id = $1`, [u.empresa_id]),
   ]);
+  // planos: só para quem usa o módulo (nada aparece para barbearias sem planos)
+  const planos = (await usaPlanos(u.empresa_id))
+    ? await resumoPlanos(u.empresa_id, instanteLocal(f.de, 0, cfg.fuso_horario), instanteLocal(somarDias(f.ate, 1), 0, cfg.fuso_horario))
+    : null;
   const caminho = `/${u.empresa_slug}`;
   const qr = await QRCode.toDataURL(`${origem}${caminho}`, { margin: 1, width: 320 });
   const maxServ = Math.max(...d.topServicos.map((s) => s.qtd), 1);
@@ -49,14 +55,73 @@ export default async function VisaoGeral({ searchParams }: PageProps<"/painel">)
 
       <Filtros servicos={servicos} profissionais={profissionais} periodoAtual={f.periodo} de={f.de} ate={f.ate} busca />
 
-      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <Kpi icone="dinheiro" rotulo="Faturamento realizado" valor={reais(d.kpis.realizado.valor)} variacao={d.kpis.realizado.var} detalhe={comp} />
+      <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi
+          icone="dinheiro"
+          rotulo="Faturamento realizado"
+          valor={reais(d.kpis.realizado.valor)}
+          variacao={d.kpis.realizado.var}
+          detalhe={planos ? "atendimentos (planos à parte)" : comp}
+        />
         <Kpi icone="grafico" rotulo="Receita prevista" valor={reais(d.kpis.previsto.valor)} variacao={d.kpis.previsto.var} detalhe="confirm. + concl." />
-        <Kpi icone="calendario" rotulo="Agendamentos" valor={String(d.kpis.agendamentos.valor)} variacao={d.kpis.agendamentos.var} detalhe="sem cancelados" />
+        <Kpi icone="alerta" rotulo="A receber" valor={reais(d.kpis.aReceber)} detalhe="concluídos sem pagamento" />
         <Kpi icone="tesoura" rotulo="Ticket médio" valor={reais(d.kpis.ticket.valor)} variacao={d.kpis.ticket.var} detalhe="por atendimento" />
-        <Kpi icone="usuarios" rotulo="Clientes novos" valor={String(d.kpis.novosClientes.valor)} variacao={d.kpis.novosClientes.var} detalhe={`${total_clientes} no total`} />
-        <Kpi icone="alerta" rotulo="Cancelamentos + faltas" valor={`${d.kpis.taxaPerda}%`} detalhe={`${d.atual.cancelados} canc. · ${d.atual.faltas} faltas`} />
+        <Kpi icone="calendario" rotulo="Agendamentos" valor={String(d.kpis.agendamentos.valor)} variacao={d.kpis.agendamentos.var} detalhe="sem cancelados" />
+        <Kpi
+          icone="usuarios"
+          rotulo="Clientes atendidos"
+          valor={String(d.kpis.atendidos.valor)}
+          variacao={d.kpis.atendidos.var}
+          detalhe={`${d.kpis.novosClientes.valor} novos · ${total_clientes} na base`}
+        />
+        <Kpi icone="recorrente" rotulo="Clientes recorrentes" valor={String(d.kpis.recorrentes)} detalhe={`${RECORRENTE_VISITAS}+ visitas em 90 dias`} />
+        <Kpi icone="bloqueio" rotulo="Cancelamentos + faltas" valor={`${d.kpis.taxaPerda}%`} detalhe={`${d.atual.cancelados} canc. · ${d.atual.faltas} faltas`} />
       </section>
+
+      {planos && (
+        <section className="card mt-6 p-4 md:p-5" aria-labelledby="titulo-planos-dash">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 id="titulo-planos-dash" className="font-medium">
+                Planos mensais
+              </h2>
+              <p className="text-xs muted">Receita recorrente e renovações. Atendimentos cobertos não entram no faturamento acima.</p>
+            </div>
+            <Link href="/painel/planos" className="text-xs muted hover:text-white">
+              Planos →
+            </Link>
+          </div>
+          <dl className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
+            {[
+              ["Assinaturas ativas", String(planos.ativas)],
+              ["Receita recorrente mensal", reais(planos.recorrenteMensal)],
+              ["Recebido de planos no período", reais(planos.recebido)],
+              ["Mensalidades em aberto", `${reais(planos.emAberto.valor)} (${planos.emAberto.qtd})`],
+              ["Atendimentos cobertos", `${d.atual.cobertos} · ${reais(d.atual.valor_coberto)}`],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-lg border border-white/[0.08] p-3">
+                <dt className="text-xs muted">{k}</dt>
+                <dd className="num mt-1 font-semibold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {planos.renovacoes.length > 0 && (
+            <p className="mt-3 text-xs muted">
+              Próximas renovações:{" "}
+              {planos.renovacoes
+                .slice(0, 4)
+                .map((r) => `${r.cliente.split(" ")[0]} (${r.ciclo_fim.slice(8, 10)}/${r.ciclo_fim.slice(5, 7)})`)
+                .join(", ")}
+              {planos.renovacoes.length > 4 && ` e mais ${planos.renovacoes.length - 4}`}
+            </p>
+          )}
+          {planos.inadimplentes > 0 && (
+            <p className="mt-1 text-xs text-[#ff9aa2]">
+              {planos.inadimplentes} assinatura{planos.inadimplentes > 1 ? "s" : ""} com mensalidade atrasada.
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <GraficoReceita serie={d.serie} />

@@ -4,6 +4,9 @@ import { configAgendamento } from "./empresa";
 import { diaLocal, instanteLocal, somarDias } from "./tempo";
 import { isUuid } from "./validacao";
 
+/** Cliente recorrente = 3+ atendimentos concluídos em 90 dias. Vale para todos, com ou sem plano. */
+export const RECORRENTE_VISITAS = 3;
+
 export const STATUS_VALIDOS = ["confirmado", "pendente_pagamento", "concluido", "cancelado", "faltou"] as const;
 
 export interface Filtros {
@@ -109,14 +112,25 @@ export function whereAgendamentos(empresaId: string, f: Filtros, inicio: Date, f
   return { where: cond.join(" and "), params };
 }
 
+/** Valor do atendimento que a barbearia recebe (preço menos a parte coberta por plano mensal). */
+export const VALOR = (alias = "a") => `(${alias}.preco_centavos - ${alias}.valor_coberto_centavos)`;
+/** Saldo ainda não recebido de um atendimento (nunca negativo). */
+export const SALDO = (alias = "a") =>
+  `greatest(${VALOR(alias)} - coalesce((select sum(pg.valor_centavos) from pagamento pg where pg.agendamento_id = ${alias}.id and pg.status = 'pago'),0), 0)`;
+
 interface Totais {
   agendamentos: number;
   concluidos: number;
+  concluidos_pagos: number;
   cancelados: number;
   faltas: number;
   realizado: number;
   previsto: number;
   clientes_unicos: number;
+  atendidos: number;
+  a_receber: number;
+  cobertos: number;
+  valor_coberto: number;
 }
 
 async function totais(empresaId: string, f: Filtros, ini: Date, fim: Date): Promise<Totais> {
@@ -124,11 +138,16 @@ async function totais(empresaId: string, f: Filtros, ini: Date, fim: Date): Prom
   const [t] = await q<Totais>(
     `select count(*) filter (where a.status not in ('cancelado'))::int as agendamentos,
             count(*) filter (where a.status = 'concluido')::int as concluidos,
+            count(*) filter (where a.status = 'concluido' and a.preco_centavos > a.valor_coberto_centavos)::int as concluidos_pagos,
             count(*) filter (where a.status = 'cancelado')::int as cancelados,
             count(*) filter (where a.status = 'faltou')::int as faltas,
-            coalesce(sum(a.preco_centavos) filter (where a.status = 'concluido'),0)::int as realizado,
-            coalesce(sum(a.preco_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as previsto,
-            count(distinct a.cliente_id) filter (where a.status not in ('cancelado'))::int as clientes_unicos
+            coalesce(sum(${VALOR()}) filter (where a.status = 'concluido'),0)::int as realizado,
+            coalesce(sum(${VALOR()}) filter (where a.status in ('confirmado','concluido')),0)::int as previsto,
+            count(distinct a.cliente_id) filter (where a.status not in ('cancelado'))::int as clientes_unicos,
+            count(distinct a.cliente_id) filter (where a.status = 'concluido')::int as atendidos,
+            coalesce(sum(${SALDO()}) filter (where a.status = 'concluido'),0)::int as a_receber,
+            count(*) filter (where a.valor_coberto_centavos > 0 and a.status <> 'cancelado')::int as cobertos,
+            coalesce(sum(a.valor_coberto_centavos) filter (where a.status <> 'cancelado'),0)::int as valor_coberto
      from agendamento a where ${where}`,
     params,
   );
@@ -153,20 +172,20 @@ export async function dashboard(empresaId: string, f: Filtros) {
     totais(empresaId, f, iniAnt, ini),
     q<{ dia: string; valor: number; qtd: number }>(
       `select to_char(a.inicio at time zone $${params.length + 1}, 'YYYY-MM-DD') as dia,
-              coalesce(sum(a.preco_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor,
+              coalesce(sum(${VALOR()}) filter (where a.status in ('confirmado','concluido')),0)::int as valor,
               count(*) filter (where a.status not in ('cancelado'))::int as qtd
        from agendamento a where ${where} group by 1 order by 1`,
       [...params, fuso],
     ),
     q<{ id: string; nome: string; qtd: number; valor: number }>(
-      `select s.id, s.nome, count(*)::int as qtd, coalesce(sum(a.preco_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor
+      `select s.id, s.nome, count(*)::int as qtd, coalesce(sum(${VALOR()}) filter (where a.status in ('confirmado','concluido')),0)::int as valor
        from agendamento a join servico s on s.id = a.servico_id
        where ${where} and a.status not in ('cancelado') group by s.id, s.nome order by qtd desc, valor desc limit 6`,
       params,
     ),
     q<{ id: string; nome: string; telefone: string; visitas: number; valor: number }>(
       `select c.id, c.nome, c.telefone, count(*)::int as visitas,
-              coalesce(sum(a.preco_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor
+              coalesce(sum(${VALOR()}) filter (where a.status in ('confirmado','concluido')),0)::int as valor
        from agendamento a join cliente c on c.id = a.cliente_id
        where ${where} and a.status not in ('cancelado','faltou') group by c.id order by valor desc, visitas desc limit 5`,
       params,
@@ -193,8 +212,16 @@ export async function dashboard(empresaId: string, f: Filtros) {
   const serieCompleta: { dia: string; valor: number; qtd: number }[] = [];
   for (let d = f.de; d <= f.ate; d = somarDias(d, 1)) serieCompleta.push(mapa.get(d) ?? { dia: d, valor: 0, qtd: 0 });
 
-  const ticket = atual.concluidos ? Math.round(atual.realizado / atual.concluidos) : 0;
-  const ticketAnt = anterior.concluidos ? Math.round(anterior.realizado / anterior.concluidos) : 0;
+  // recorrentes: 3+ visitas concluídas nos últimos 90 dias (não depende de plano)
+  const [{ recorrentes }] = await q<{ recorrentes: number }>(
+    `select count(*)::int as recorrentes from (
+       select cliente_id from agendamento where empresa_id = $1 and status = 'concluido' and inicio >= now() - interval '90 days' and inicio <= now()
+       group by cliente_id having count(*) >= ${RECORRENTE_VISITAS}) x`,
+    [empresaId],
+  );
+  // ticket médio só sobre atendimentos com valor a receber (cobertos 100% pelo plano não entram)
+  const ticket = atual.concluidos_pagos ? Math.round(atual.realizado / atual.concluidos_pagos) : 0;
+  const ticketAnt = anterior.concluidos_pagos ? Math.round(anterior.realizado / anterior.concluidos_pagos) : 0;
   const base = atual.agendamentos + atual.cancelados;
   const taxaPerda = base ? Math.round(((atual.cancelados + atual.faltas) / base) * 100) : 0;
 
@@ -208,6 +235,9 @@ export async function dashboard(empresaId: string, f: Filtros) {
       agendamentos: { valor: atual.agendamentos, var: variacao(atual.agendamentos, anterior.agendamentos) },
       ticket: { valor: ticket, var: variacao(ticket, ticketAnt) },
       novosClientes: { valor: novosClientes[0].n, var: variacao(novosClientes[0].n, novosAnt[0].n) },
+      atendidos: { valor: atual.atendidos, var: variacao(atual.atendidos, anterior.atendidos) },
+      aReceber: atual.a_receber,
+      recorrentes,
       taxaPerda,
     },
     serie: serieCompleta,

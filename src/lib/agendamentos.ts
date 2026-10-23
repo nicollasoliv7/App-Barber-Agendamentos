@@ -8,6 +8,7 @@ import { ErroNegocio, type Agendamento, type CampoPersonalizado } from "./tipos"
 import { cnpjValido, cpfValido, dataValida, formatarTelefone, normalizarTelefone } from "./validacao";
 import { tokenAleatorio } from "./senha";
 import { parametrosModelo, textoConfirmacao, type DadosMensagem } from "./mensagens";
+import { aplicarCobertura, avaliarCobertura, removerCobertura } from "./planos";
 
 export interface NovoAgendamento {
   empresaId: string;
@@ -116,11 +117,14 @@ export async function criarAgendamento(dados: NovoAgendamento): Promise<Agendame
     const clienteId = await upsertCliente(t, dados.empresaId, nome, telefone, extras);
     const inicio = instanteLocal(dados.dia, minuto, cfg.fuso_horario);
     const fim = new Date(inicio.getTime() + serv.duracao_min * 60000);
-    const obrigatorio = cfg.pagamento_modo === "obrigatorio" && !painel;
+    // R57: serviço coberto 100% pelo plano do cliente não exige Pix (não há o que cobrar de novo)
+    const cobertura = await avaliarCobertura(t, { empresa_id: dados.empresaId, cliente_id: clienteId, servico_id: dados.servicoId, inicio });
+    const totalmenteCoberto = cobertura.elegivel && (cobertura.valorCliente ?? 0) === 0;
+    const obrigatorio = cfg.pagamento_modo === "obrigatorio" && !painel && !totalmenteCoberto;
     const status = obrigatorio ? "pendente_pagamento" : "confirmado"; // R13
     const expira = obrigatorio ? new Date(Date.now() + cfg.pix_expiracao_min * 60000) : null;
 
-    const [ag] = await t.query<Agendamento>(
+    let [ag] = await t.query<Agendamento>(
       `insert into agendamento (empresa_id, cliente_id, profissional_id, servico_id, inicio, fim, preco_centavos,
                                 status, origem, expira_em, token_publico, observacao)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
@@ -141,6 +145,9 @@ export async function criarAgendamento(dados: NovoAgendamento): Promise<Agendame
     );
 
     if (status === "confirmado") {
+      // R58: cliente com plano ativo que cobre o serviço → registra o uso do benefício (sem nova cobrança)
+      const usado = await aplicarCobertura(t, ag);
+      if (usado.elegivel) ag = { ...ag, valor_coberto_centavos: usado.valorCoberto ?? 0 };
       await notificarConfirmacao(t, ag, { cliente: nome, telefone, servico: serv.nome, profissional: prof.nome, empresa: emp });
     }
     return ag;
@@ -172,7 +179,11 @@ export async function notificarConfirmacao(
     agendamentoId: ag.id,
     destino: info.telefone,
     tipo: "confirmacao",
-    mensagem: `${textoConfirmacao(dados)} Valor: ${reais(ag.preco_centavos)}.`,
+    mensagem: `${textoConfirmacao(dados)} ${
+      (ag.valor_coberto_centavos ?? 0) >= ag.preco_centavos
+        ? "Incluído no seu plano."
+        : `Valor: ${reais(ag.preco_centavos - (ag.valor_coberto_centavos ?? 0))}${ag.valor_coberto_centavos ? " (com o desconto do seu plano)" : ""}.`
+    }`,
     parametros: parametrosModelo(dados),
   });
   if (info.empresa.telefone_whatsapp) {
@@ -221,6 +232,7 @@ export async function cancelarPeloCliente(id: string, clienteId: AcessoCliente) 
       throw new ErroNegocio(`Cancelamento permitido até ${cfg.cancelamento_ate_min / 60}h antes. Fale com a barbearia.`);
     await t.query(`update agendamento set status = 'cancelado', cancelado_por = 'cliente' where id = $1`, [id]);
     await t.query(`update pagamento set status = 'cancelado' where agendamento_id = $1 and status = 'pendente'`, [id]);
+    await removerCobertura(t, id); // R59: cancelado devolve o uso do plano
     await notificar(t, {
       empresaId: ag.empresa_id,
       agendamentoId: id,
@@ -248,6 +260,7 @@ export async function remarcarPeloCliente(id: string, clienteId: AcessoCliente, 
     const dur = new Date(ag.fim).getTime() - new Date(ag.inicio).getTime();
     const antigo = formatarDataHora(ag.inicio);
     await t.query(`update agendamento set inicio = $2, fim = $3 where id = $1`, [id, inicio, new Date(inicio.getTime() + dur)]);
+    await reavaliarCobertura(t, id); // R59: a nova data pode cair em outro ciclo do plano
     await notificar(t, {
       empresaId: ag.empresa_id,
       agendamentoId: id,
@@ -256,6 +269,15 @@ export async function remarcarPeloCliente(id: string, clienteId: AcessoCliente, 
       mensagem: `Seu ${ag.servico_nome} foi remarcado de ${antigo} para ${formatarDataHora(inicio)}.`,
     });
   });
+}
+
+/** Recalcula a cobertura do plano depois de mudar data/serviço: remove o uso e aplica de novo, se couber. */
+async function reavaliarCobertura(t: Executor, id: string) {
+  const [ag] = await t.query<Agendamento>(`select * from agendamento where id = $1`, [id]);
+  const tinha = (ag?.valor_coberto_centavos ?? 0) > 0;
+  if (!ag || !tinha) return;
+  await removerCobertura(t, id);
+  await aplicarCobertura(t, ag);
 }
 
 /** R26 */
@@ -269,5 +291,61 @@ export async function mudarStatusPelaEmpresa(empresaId: string, id: string, stat
        where id = $1 and empresa_id = $2`,
       [id, empresaId, status],
     );
+    if (status === "cancelado") await removerCobertura(t, id); // R59
+    if (status === "confirmado" && ag.status === "cancelado") {
+      const [a] = await t.query<Agendamento>(`select * from agendamento where id = $1`, [id]);
+      await aplicarCobertura(t, a); // reaberto: volta a usar o plano, se ainda couber
+    }
+  });
+}
+
+/**
+ * R60: editar um agendamento pelo painel (data, hora, profissional e observação).
+ * Respeita expediente, folgas e conflitos; ignora a antecedência mínima (como o agendamento manual).
+ */
+export async function editarPelaEmpresa(
+  empresaId: string,
+  id: string,
+  d: { dia: string; hora: string; profissionalId: string; observacao: string | null },
+) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.dia) || !/^\d{2}:\d{2}$/.test(d.hora)) throw new ErroNegocio("Data ou hora inválida");
+  return tx(async (t) => {
+    await expirarPendentes(t);
+    const [ag] = await t.query<Agendamento & { cliente_telefone: string; servico_nome: string }>(
+      `select a.*, c.telefone as cliente_telefone, s.nome as servico_nome from agendamento a
+       join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
+       where a.id = $1 and a.empresa_id = $2 for update of a`,
+      [id, empresaId],
+    );
+    if (!ag) throw new ErroNegocio("Agendamento não encontrado", 404);
+    if (!["confirmado", "pendente_pagamento"].includes(ag.status)) throw new ErroNegocio("Só agendamentos em aberto podem ser editados");
+    const [prof] = await t.query(`select 1 from profissional where id = $1 and empresa_id = $2 for update`, [d.profissionalId, empresaId]);
+    if (!prof) throw new ErroNegocio("Profissional inválido");
+    const cfg = await configAgendamento(empresaId, t);
+    const minuto = paraMinutos(d.hora);
+    const inicio = instanteLocal(d.dia, minuto, cfg.fuso_horario);
+    const mudouHorario = inicio.getTime() !== new Date(ag.inicio).getTime() || d.profissionalId !== ag.profissional_id;
+    if (mudouHorario) {
+      const livres = await horariosLivres(empresaId, ag.servico_id, d.profissionalId, d.dia, { ignorarAgendamentoId: id, ignorarAntecedencia: true }, t);
+      if (!livres.includes(minuto)) throw new ErroNegocio("Horário indisponível para esse profissional. Escolha outro.", 409);
+    }
+    const dur = new Date(ag.fim).getTime() - new Date(ag.inicio).getTime();
+    await t.query(`update agendamento set inicio = $2, fim = $3, profissional_id = $4, observacao = $5 where id = $1`, [
+      id,
+      inicio,
+      new Date(inicio.getTime() + dur),
+      d.profissionalId,
+      d.observacao?.slice(0, 500) || null,
+    ]);
+    if (inicio.getTime() !== new Date(ag.inicio).getTime()) {
+      await reavaliarCobertura(t, id);
+      await notificar(t, {
+        empresaId,
+        agendamentoId: id,
+        destino: ag.cliente_telefone,
+        tipo: "remarcacao",
+        mensagem: `Seu ${ag.servico_nome} foi remarcado de ${formatarDataHora(ag.inicio)} para ${formatarDataHora(inicio)}.`,
+      });
+    }
   });
 }

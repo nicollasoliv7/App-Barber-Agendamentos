@@ -6,6 +6,7 @@ import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone, isUuid } from "@/lib/validacao";
 import { Icone, Kpi, StatusBadge } from "@/components/ui";
 import { salvarCliente } from "../../../acoes";
+import PlanoDoCliente from "./PlanoDoCliente";
 import { Campo, Form } from "../../../Form";
 
 export const metadata = { title: "Ficha do cliente" };
@@ -33,16 +34,17 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
   );
   if (!c) notFound();
   const [hist, [k], fav] = await Promise.all([
-    q<{ id: string; inicio: Date; status: string; preco_centavos: number; servico: string; profissional: string; pago: number }>(
-      `select a.id, a.inicio, a.status, a.preco_centavos, s.nome as servico, p.nome as profissional,
+    q<{ id: string; inicio: Date; status: string; preco_centavos: number; valor_coberto_centavos: number; servico: string; profissional: string; pago: number }>(
+      `select a.id, a.inicio, a.status, a.preco_centavos, a.valor_coberto_centavos, s.nome as servico, p.nome as profissional,
               coalesce((select sum(valor_centavos) from pagamento pg where pg.agendamento_id = a.id and pg.status='pago'),0)::int as pago
        from agendamento a join servico s on s.id = a.servico_id join profissional p on p.id = a.profissional_id
        where a.cliente_id = $1 and a.empresa_id = $2 order by a.inicio desc limit 100`,
       [id, u.empresa_id],
     ),
-    q<{ visitas: number; gasto: number; faltas: number; cancelados: number; ultimo: Date | null; proximo: Date | null }>(
+    q<{ visitas: number; visitas_pagas: number; gasto: number; faltas: number; cancelados: number; ultimo: Date | null; proximo: Date | null }>(
       `select count(*) filter (where status='concluido')::int as visitas,
-              coalesce(sum(preco_centavos) filter (where status='concluido'),0)::int as gasto,
+              count(*) filter (where status='concluido' and preco_centavos > valor_coberto_centavos)::int as visitas_pagas,
+              coalesce(sum(preco_centavos - valor_coberto_centavos) filter (where status='concluido'),0)::int as gasto,
               count(*) filter (where status='faltou')::int as faltas,
               count(*) filter (where status='cancelado')::int as cancelados,
               max(inicio) filter (where inicio < now() and status in ('concluido','confirmado')) as ultimo,
@@ -56,7 +58,7 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
       [id, u.empresa_id],
     ),
   ]);
-  const ticket = k.visitas ? Math.round(k.gasto / k.visitas) : 0;
+  const ticket = k.visitas_pagas ? Math.round(k.gasto / k.visitas_pagas) : 0; // atendimentos cobertos 100% pelo plano não entram
   const extras = Object.entries(c.dados_extras ?? {}).filter(([, v]) => v);
 
   return (
@@ -95,8 +97,8 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Indicadores do cliente">
         <Kpi rotulo="Visitas concluídas" valor={String(k.visitas)} />
-        <Kpi rotulo="Total gasto" valor={reais(k.gasto)} />
-        <Kpi rotulo="Ticket médio" valor={reais(ticket)} />
+        <Kpi rotulo="Total gasto" valor={reais(k.gasto)} detalhe="em atendimentos" />
+        <Kpi rotulo="Ticket médio" valor={reais(ticket)} detalhe={k.visitas_pagas < k.visitas ? "sem os cobertos pelo plano" : undefined} />
         <Kpi rotulo="Faltas / cancel." valor={`${k.faltas} / ${k.cancelados}`} />
         <Kpi rotulo="Próximo horário" valor={k.proximo ? formatarDataHora(k.proximo) : "—"} />
       </section>
@@ -127,7 +129,14 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
                     <td className="mono whitespace-nowrap text-[13px]">{formatarDataHora(a.inicio)}</td>
                     <td>{a.servico}</td>
                     <td className="muted">{a.profissional}</td>
-                    <td className="text-right num">{reais(a.preco_centavos)}</td>
+                    <td className="text-right num">
+                      {reais(a.preco_centavos)}
+                      {a.valor_coberto_centavos > 0 && (
+                        <div className="text-xs text-[#7ee2b0]">
+                          {a.valor_coberto_centavos >= a.preco_centavos ? "coberto pelo plano" : `plano cobre ${reais(a.valor_coberto_centavos)}`}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <StatusBadge status={a.status} />
                     </td>
@@ -139,6 +148,7 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
         </section>
 
         <div className="grid content-start gap-6">
+          <PlanoDoCliente clienteId={c.id} empresaId={u.empresa_id} gestor={u.papel === "dono" || u.papel === "admin"} />
           <section className="card p-4" aria-labelledby="titulo-dados">
             <h2 id="titulo-dados" className="mb-3 font-medium">
               Dados do cliente
