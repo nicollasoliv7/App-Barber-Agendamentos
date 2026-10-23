@@ -245,3 +245,41 @@ alter table cliente add column if not exists observacoes text;
 alter table cliente add column if not exists origem text not null default 'agendamento';
 alter table cliente add column if not exists importacao_id uuid references importacao(id) on delete set null;
 create index if not exists cliente_empresa_nome on cliente (empresa_id, nome);
+
+-- v4: WhatsApp pela API oficial da Meta (Cloud API) — uma conexão (um número) por barbearia
+create table if not exists whatsapp_conexao (
+  empresa_id uuid primary key references empresa(id) on delete cascade,
+  phone_number_id text not null unique,          -- um número só pode estar ligado a UMA barbearia
+  waba_id text not null,
+  numero_exibicao text,
+  nome_verificado text,
+  token_cifrado text not null,                   -- AES-256-GCM (chave em WHATSAPP_CHAVE_CRIPTO); nunca vai ao navegador
+  app_secret_cifrado text,                       -- opcional: só se a barbearia usa um app próprio da Meta
+  idioma text not null default 'pt_BR',
+  modelo_confirmacao text,
+  modelo_confirmacao_params int,
+  modelo_lembrete text,
+  modelo_lembrete_params int,
+  modelo_codigo text,
+  modelo_codigo_botao boolean not null default false,
+  lembretes_ativos boolean not null default false,
+  status text not null default 'conectado' check (status in ('conectado','erro')),
+  ultimo_erro text,
+  verificado_em timestamptz not null default now(),
+  ultimo_webhook_em timestamptz,
+  criado_em timestamptz not null default now()
+);
+
+alter table notificacao add column if not exists tipo text;
+alter table notificacao add column if not exists parametros jsonb;
+alter table notificacao add column if not exists provedor_msg_id text;
+alter table notificacao add column if not exists erro text;
+alter table notificacao add column if not exists atualizado_em timestamptz;
+create unique index if not exists notificacao_provedor_msg_id_key on notificacao (provedor_msg_id);
+create index if not exists notificacao_empresa_data on notificacao (empresa_id, criado_em desc);
+alter table notificacao drop constraint if exists notificacao_status_check;
+-- registros antigos marcados como "enviado" sem provedor nunca saíram de verdade
+update notificacao set status = 'nao_enviado', erro = 'Registrada antes da integração com o WhatsApp (não enviada)'
+ where status = 'enviado' and provedor_msg_id is null and tipo is null;
+alter table notificacao add constraint notificacao_status_check
+  check (status in ('pendente','nao_enviado','aceito','enviado','entregue','lido','falhou'));

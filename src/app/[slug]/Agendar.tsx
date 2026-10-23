@@ -6,6 +6,7 @@ import { Icone } from "@/components/ui";
 import { api, mascaraDoc, mascaraTelefone, type PagamentoCfg } from "./cliente-api";
 import type { CampoPub, EmpresaPub, ServicoPub } from "./PaginaPublica";
 import Pagamento from "./Pagamento";
+import { linkWhatsapp } from "@/lib/mensagens";
 
 interface Props {
   slug: string;
@@ -30,6 +31,8 @@ type Criado = {
   profissional: string | null;
   token: string;
   gerenciar: string;
+  /** status real da confirmação automática por WhatsApp (null = não gerada ainda) */
+  whatsapp?: string | null;
 };
 type Etapa = "servico" | "profissional" | "horario" | "dados" | "pagamento" | "pronto";
 
@@ -238,9 +241,7 @@ export default function Agendar(p: Props) {
             </span>
             <h2 className="mt-1 text-xl font-semibold">Agendamento confirmado!</h2>
             <p className="text-sm suave">
-              {p.whatsappAtivo
-                ? "Enviamos a confirmação para o seu WhatsApp."
-                : "Guarde este comprovante ou adicione à sua agenda."}
+              {criado.whatsapp === "aceito" ? "A confirmação está a caminho do seu WhatsApp." : "Guarde este comprovante ou adicione à sua agenda."}
             </p>
           </div>
           <dl className="divide-hair border-t border-white/[0.08] text-sm">
@@ -258,6 +259,20 @@ export default function Agendar(p: Props) {
             ))}
           </dl>
         </div>
+
+        {p.empresa.whatsapp && criado.whatsapp !== "aceito" && !(criado.whatsapp == null && p.whatsappAtivo) && (
+          <a
+            className="btn btn-sutil mt-4 w-full"
+            target="_blank"
+            rel="noreferrer"
+            href={linkWhatsapp(
+              p.empresa.whatsapp,
+              `Olá! Acabei de agendar ${servico.nome} com ${criado.profissional ?? prof?.nome ?? ""} para ${dia ? diaLongo(dia) : ""} às ${hora}. Nome: ${nome.trim()}.`,
+            )}
+          >
+            <Icone nome="whatsapp" tamanho={15} /> Avisar a barbearia pelo WhatsApp
+          </a>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a className="btn btn-sutil" href={`${base}/agendamentos/${criado.id}/ics?t=${criado.token}`}>

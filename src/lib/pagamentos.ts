@@ -106,13 +106,13 @@ async function aprovar(t: Executor, pagamentoId: string, agendamentoId: string) 
   );
   if (ag) {
     // R19: era pendente → agora confirmado; dispara a confirmação (R14)
-    const [info] = await t.query<{ cliente: string; telefone: string; servico: string; profissional: string; enome: string; ewhats: string | null }>(
-      `select c.nome as cliente, c.telefone, s.nome as servico, p.nome as profissional, e.nome as enome, e.telefone_whatsapp as ewhats
+    const [info] = await t.query<{ cliente: string; telefone: string; servico: string; profissional: string; enome: string; eslug: string; ewhats: string | null }>(
+      `select c.nome as cliente, c.telefone, s.nome as servico, p.nome as profissional, e.nome as enome, e.slug as eslug, e.telefone_whatsapp as ewhats
        from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
        join profissional p on p.id = a.profissional_id join empresa e on e.id = a.empresa_id where a.id = $1`,
       [agendamentoId],
     );
-    await notificarConfirmacao(t, ag, { ...info, empresa: { nome: info.enome, telefone_whatsapp: info.ewhats } });
+    await notificarConfirmacao(t, ag, { ...info, empresa: { nome: info.enome, slug: info.eslug, telefone_whatsapp: info.ewhats } });
   }
 }
 

@@ -2,6 +2,8 @@ import { q, q1 } from "@/lib/db";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento, configTema } from "@/lib/empresa";
 import type { CampoPersonalizado, Empresa } from "@/lib/tipos";
+import { conexaoPublica } from "@/lib/whatsapp";
+import Link from "next/link";
 import { salvarCampo, salvarEmpresa, salvarRegras, salvarTema, salvarUnidade } from "../../acoes";
 import { Campo, Form, inp } from "../../Form";
 
@@ -9,7 +11,7 @@ export const metadata = { title: "Configurações" };
 
 export default async function Page() {
   const u = await usuarioOuLogin();
-  const [e, tema, cfg, campos, unidades] = await Promise.all([
+  const [e, tema, cfg, campos, unidades, wa] = await Promise.all([
     q1<Empresa>(`select * from empresa where id = $1`, [u.empresa_id]),
     configTema(u.empresa_id),
     configAgendamento(u.empresa_id),
@@ -18,6 +20,7 @@ export default async function Page() {
       `select id, nome, endereco, maps_url, ativo from unidade where empresa_id = $1 order by nome`,
       [u.empresa_id],
     ),
+    conexaoPublica(u.empresa_id),
   ]);
   const card = "card p-4 md:p-5";
   const integracoes = [
@@ -29,11 +32,13 @@ export default async function Page() {
     },
     {
       nome: "WhatsApp",
-      ok: !!process.env.WHATSAPP_API_URL,
-      estado: "Não configurado",
-      texto: process.env.WHATSAPP_API_URL
-        ? "Mensagens enviadas pelo provedor configurado."
-        : "Mensagens ficam registradas em Notificações, mas não são enviadas. Configure WHATSAPP_API_URL com um provedor.",
+      ok: wa?.status === "conectado" && !!wa.modelo_confirmacao,
+      estado: !wa ? "Não conectado" : wa.status === "erro" ? "Erro na conexão" : "Falta o modelo",
+      texto:
+        wa?.status === "conectado" && wa.modelo_confirmacao
+          ? `Confirmações automáticas pelo número ${wa.numero_exibicao ?? wa.phone_number_id} (API oficial da Meta).`
+          : "Nenhuma mensagem automática é enviada; o envio manual pelo seu WhatsApp continua disponível. Configure em WhatsApp.",
+      href: "/painel/whatsapp",
     },
     {
       nome: "Pagamentos online",
@@ -65,7 +70,15 @@ export default async function Page() {
             <li key={i.nome} className="flex items-start gap-3 rounded-lg border border-white/[0.08] p-3">
               <span className={`badge ${i.ok ? "badge-ok" : "badge-warn"}`}>{i.ok ? "Ativo" : i.estado}</span>
               <span>
-                <b className="font-medium">{i.nome}</b>
+                <b className="font-medium">
+                  {"href" in i && i.href ? (
+                    <Link href={i.href} className="underline underline-offset-2">
+                      {i.nome}
+                    </Link>
+                  ) : (
+                    i.nome
+                  )}
+                </b>
                 <span className="block text-xs muted">{i.texto}</span>
               </span>
             </li>
@@ -82,7 +95,7 @@ export default async function Page() {
           <Campo rotulo="Endereço da página (agendou/…)">
             <input name="slug" required defaultValue={e!.slug} className={inp} />
           </Campo>
-          <Campo rotulo="WhatsApp da empresa (recebe avisos de novos agendamentos)">
+          <Campo rotulo="WhatsApp da barbearia (o cliente usa para falar com você)">
             <input name="telefone_whatsapp" defaultValue={e!.telefone_whatsapp ?? ""} className={inp} />
           </Campo>
           <Campo rotulo="Endereço">

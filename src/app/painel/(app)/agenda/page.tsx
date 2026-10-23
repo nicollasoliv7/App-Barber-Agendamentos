@@ -3,13 +3,17 @@ import { q } from "@/lib/db";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
-import { diaLocal, formatarDia, instanteLocal, minutosLocal, hhmm, reais, somarDias } from "@/lib/tempo";
+import { diaLocal, formatarDataHora, formatarDia, instanteLocal, minutosLocal, hhmm, reais, somarDias } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 import { estornarPagamentos, mudarStatus, novoAgendamentoManual, registrarPagamentoLocal } from "../../acoes";
 import { Cabecalho, Campo, Form, inp } from "../../Form";
 import { Icone, StatusBadge } from "@/components/ui";
+import { linkGerenciar } from "@/lib/agendamentos";
+import { linkWhatsapp, textoConfirmacao } from "@/lib/mensagens";
 
 export const metadata = { title: "Agenda" };
+/** horário ainda não chegou (fora do render, para manter o componente puro) */
+const aindaVai = (d: Date) => new Date(d).getTime() > Date.now();
 
 
 type Linha = {
@@ -25,6 +29,7 @@ type Linha = {
   profissional_id: string;
   pago: number;
   cancelado_por: string | null;
+  token_publico: string;
 };
 
 export default async function Agenda({ searchParams }: PageProps<"/painel/agenda">) {
@@ -44,7 +49,7 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
       [u.empresa_id],
     ),
     q<Linha>(
-      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por,
+      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por, a.token_publico,
               c.nome as cliente, c.telefone, s.nome as servico,
               coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
        from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
@@ -132,7 +137,30 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
                           {a.origem === "painel" && " · manual"}
                         </div>
                       </div>
-                      <StatusBadge status={a.status} />
+                      <div className="flex flex-col items-end gap-1.5">
+                        <StatusBadge status={a.status} />
+                        {a.status === "confirmado" && aindaVai(a.inicio) && (
+                          <a
+                            href={linkWhatsapp(
+                              a.telefone,
+                              textoConfirmacao({
+                                cliente: a.cliente,
+                                empresa: u.empresa_nome,
+                                servico: a.servico,
+                                profissional: p.nome,
+                                quando: formatarDataHora(a.inicio, cfg.fuso_horario),
+                                link: linkGerenciar(u.empresa_slug, a),
+                              }),
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-[#7ee2b0] hover:underline"
+                            title="Abre o seu WhatsApp com a confirmação pronta para enviar"
+                          >
+                            <Icone nome="whatsapp" tamanho={13} /> WhatsApp
+                          </a>
+                        )}
+                      </div>
                     </div>
                     {a.status === "cancelado" && a.pago > 0 && (
                       <form action={estornarPagamentos} className="mt-2">

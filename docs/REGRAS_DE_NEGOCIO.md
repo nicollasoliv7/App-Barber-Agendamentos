@@ -22,7 +22,7 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
   - pagamento `desativado` ou `opcional` → `confirmado`;
   - pagamento `obrigatorio` → `pendente_pagamento`, com `expira_em = agora + pix_expiracao_min` (5 min).
 - **R14** — Ao confirmar, gera notificação de WhatsApp para o cliente e para a empresa.
-- **R14b · Lembrete** — Agendamentos `confirmado` recebem **um** lembrete por WhatsApp quando faltam até `LEMBRETE_HORAS_ANTES` horas (padrão 3). Uma rotina interna roda a cada minuto; em produção serverless, use `POST /api/cron/lembretes`.
+- **R14b · Lembrete** — Agendamentos `confirmado` recebem **um** lembrete por WhatsApp quando faltam até `LEMBRETE_HORAS_ANTES` horas (padrão 3), **só** nas barbearias com WhatsApp conectado, modelo de lembrete aprovado e lembretes ligados (R53). Uma rotina interna roda a cada minuto; em produção serverless, use `POST /api/cron/lembretes`.
 
 ## 3. Pagamento (somente sandbox)
 - **R15 · Modalidades** — `desativado`: sem cobrança online. `opcional`: o cliente pode pagar agora ou no local. `obrigatorio`: sem pagamento aprovado dentro do prazo, o agendamento é cancelado.
@@ -56,7 +56,7 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
 ## 7. Agendamento público sem login (v3)
 - **R35 · Sem preferência** — Quando o serviço tem mais de um profissional, o cliente pode escolher "Sem preferência". Os dias e horários mostrados são a união dos horários livres dos profissionais elegíveis (R7/R7b). Ao confirmar, o sistema checa de novo, dentro da transação, quem está livre naquele horário e escolhe quem tem **menos atendimentos no dia**. Se ninguém estiver livre, responde 409 (R10).
 - **R36 · Gerenciar pelo link** — Cada agendamento tem um token secreto (`token_publico`, 32 caracteres). O link `/{slug}/agendamento/{id}?t={token}` permite ver, remarcar e cancelar **sem login**, com as mesmas regras de prazo (R22/R23). O token só vale para aquele agendamento e só dentro da empresa do slug. Token errado devolve 404, sem revelar se o agendamento existe.
-- **R37 · Comprovante** — Após confirmar, o cliente pode baixar um `.ics` (com lembrete 2 h antes) ou abrir o Google Agenda. A mensagem "Enviamos a confirmação no WhatsApp" só aparece quando há provedor de WhatsApp configurado.
+- **R37 · Comprovante** — Após confirmar, o cliente pode baixar um `.ics` (com lembrete 2 h antes) ou abrir o Google Agenda. A frase "A confirmação está a caminho do seu WhatsApp" só aparece quando a Meta **aceitou** o envio; caso contrário, o cliente vê o botão "Avisar a barbearia pelo WhatsApp" (R55).
 - **R38 · Dados no aparelho** — Nome e telefone podem ser lembrados **no próprio aparelho** (localStorage) para o próximo agendamento. Nada é enviado ao servidor antes de confirmar.
 
 ## 8. Importação de clientes (v3)
@@ -73,3 +73,12 @@ Os valores entre parênteses são os padrões, todos configuráveis por empresa 
 - **R47 · Indicadores** — faturamento realizado (concluídos), receita prevista (confirmados + concluídos), agendamentos (sem cancelados), ticket médio (realizado ÷ concluídos), clientes novos e taxa de cancelamentos + faltas. A variação é comparada com o período anterior de mesmo tamanho; sem base de comparação, não se mostra porcentagem.
 - **R48 · Segmentos de clientes** — com horário marcado, sem visita há 45+ dias (sem horário futuro), novos (30 dias) e importados.
 - **R49 · Exportação** — o CSV de agendamentos respeita os filtros e é protegido contra *CSV injection*: células que começam com `= + - @` ganham apóstrofo na frente.
+
+## 10. WhatsApp (v4)
+- **R50 · Um número por barbearia** — Cada empresa conecta o próprio número na WhatsApp Cloud API (oficial da Meta). O `phone_number_id` é único: o mesmo número não pode servir a duas barbearias. Toda mensagem sai **somente** pelo número da empresa dona da mensagem; não existe número global.
+- **R51 · Conexão verificada** — Ao conectar, o servidor confere na Meta se o token vale, se o número existe e se pertence à WABA informada. Só dono/admin conectam, alteram ou desconectam.
+- **R52 · Credenciais** — Token e App Secret são guardados criptografados (AES-256-GCM, chave `WHATSAPP_CHAVE_CRIPTO`), lidos só no servidor e nunca devolvidos às telas. Desconectar apaga as credenciais.
+- **R53 · Modelos** — Mensagens iniciadas pela barbearia usam modelos aprovados: confirmação, lembrete (variáveis `{{1}}`…`{{6}}` em ordem fixa) e código de verificação (autenticação). O nome, o idioma e a aprovação são conferidos na Meta ao salvar. Tipos sem modelo (cancelamento, remarcação, aviso à empresa) ficam registrados como **não enviados**.
+- **R54 · Status honesto** — `nao_enviado` (sem conexão, conexão com erro ou sem modelo), `aceito` (a Meta aceitou), `enviado`/`entregue`/`lido`/`falhou` (somente via webhook com assinatura válida). O status nunca regride. Um evento só altera mensagens da empresa dona do número que o gerou. Token recusado pela Meta coloca a conexão em `erro`, e os envios param até "Testar conexão" ou reconectar.
+- **R55 · Envio manual** — Sem integração, o painel (Agenda, Agendamentos, Notificações) oferece o botão que abre o WhatsApp do barbeiro com a mensagem pronta (`wa.me`), e a página pública oferece "Avisar a barbearia pelo WhatsApp". Esses envios **não** são marcados como enviados.
+- **R56 · Envio após o commit** — A chamada à Meta acontece depois que a transação do agendamento é gravada; uma falha no WhatsApp nunca desfaz nem bloqueia o agendamento.

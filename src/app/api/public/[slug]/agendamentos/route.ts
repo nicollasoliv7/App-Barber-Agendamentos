@@ -4,6 +4,7 @@ import { criarAgendamento } from "@/lib/agendamentos";
 import { q1 } from "@/lib/db";
 import { isUuid } from "@/lib/validacao";
 import { ErroNegocio } from "@/lib/tipos";
+import { statusConfirmacao } from "@/lib/notificacoes";
 
 /** Cria agendamento pela página pública (R9–R14). Não exige login (R31). */
 export async function POST(req: Request, ctx: RouteContext<"/api/public/[slug]/agendamentos">) {
@@ -32,7 +33,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/public/[slug]/a
       telefone: String(b.telefone ?? ""),
       extras: typeof b.extras === "object" && b.extras ? b.extras : {},
     });
-    const prof = await q1<{ nome: string }>(`select nome from profissional where id = $1`, [ag.profissional_id]);
+    const [prof, whatsapp] = await Promise.all([
+      q1<{ nome: string }>(`select nome from profissional where id = $1`, [ag.profissional_id]),
+      statusConfirmacao(ag.id), // status real: "aceito" só se a Meta aceitou o envio
+    ]);
     return ok(
       {
         agendamento: {
@@ -45,6 +49,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/public/[slug]/a
           profissional: prof?.nome ?? null,
           token: ag.token_publico, // autoriza pagar/gerenciar este agendamento sem login
           gerenciar: `/${slug}/agendamento/${ag.id}?t=${ag.token_publico}`,
+          whatsapp,
         },
       },
       201,

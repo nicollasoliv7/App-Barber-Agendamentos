@@ -123,7 +123,7 @@ const COD_TENTATIVAS = 5;
 export async function enviarCodigo(empresaId: string, telefoneBruto: string) {
   const telefone = normalizarTelefone(telefoneBruto);
   if (!telefone) throw new ErroNegocio("Telefone inválido");
-  return tx(async (t) => {
+  const r = await tx(async (t) => {
     const [recente] = await t.query(
       `select 1 from codigo_verificacao where empresa_id = $1 and telefone = $2 and criado_em > now() - make_interval(secs => $3)`,
       [empresaId, telefone, COD_REENVIO_S],
@@ -135,9 +135,18 @@ export async function enviarCodigo(empresaId: string, telefoneBruto: string) {
       `insert into codigo_verificacao (empresa_id, telefone, codigo_hash, expira_em) values ($1,$2,$3, now() + make_interval(mins => $4))`,
       [empresaId, telefone, sha256(`${telefone}:${codigo}`), COD_VALIDADE_MIN],
     );
-    await notificar(t, { empresaId, destino: telefone, mensagem: `Seu código de verificação é ${codigo}. Ele vale por ${COD_VALIDADE_MIN} minutos.` });
-    return { reenvioEmSegundos: COD_REENVIO_S, codigoDev: process.env.NODE_ENV !== "production" || process.env.MODO_DEMO === "1" ? codigo : undefined };
+    const notificacaoId = await notificar(t, {
+      empresaId,
+      destino: telefone,
+      tipo: "codigo",
+      parametros: [codigo],
+      mensagem: `Seu código de verificação é ${codigo}. Ele vale por ${COD_VALIDADE_MIN} minutos.`,
+    });
+    return { notificacaoId, reenvioEmSegundos: COD_REENVIO_S, codigoDev: process.env.NODE_ENV !== "production" || process.env.MODO_DEMO === "1" ? codigo : undefined };
   });
+  // o envio acontece depois do commit; aqui só lemos o resultado real
+  const st = await q1<{ status: string }>(`select status from notificacao where id = $1`, [r.notificacaoId]);
+  return { reenvioEmSegundos: r.reenvioEmSegundos, codigoDev: r.codigoDev, enviado: st?.status === "aceito" };
 }
 
 /** Cadastra (ou redefine) a senha após validar o código enviado ao telefone. */

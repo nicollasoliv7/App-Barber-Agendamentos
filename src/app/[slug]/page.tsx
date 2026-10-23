@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { confirmacaoAutomaticaAtiva } from "@/lib/whatsapp";
 import { notFound } from "next/navigation";
 import { q, q1 } from "@/lib/db";
 import { camposAtivos, configAgendamento, configTema, servicosAtivos } from "@/lib/empresa";
@@ -50,7 +51,7 @@ export default async function Page({ params }: PageProps<"/[slug]">) {
         unidades={e.multiunidade ? unidades : []}
         pixel={e.pixel_campanha}
         totalProfissionais={profs}
-        whatsappAtivo={!!process.env.WHATSAPP_API_URL}
+        whatsappAtivo={await confirmacaoAutomaticaAtiva(e.id)}
         regras={{ cancelamentoH: cfg.cancelamento_ate_min / 60 }}
         servicos={servicos.map((s) => ({
           id: s.id,

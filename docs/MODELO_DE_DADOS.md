@@ -28,6 +28,7 @@ erDiagram
   CLIENTE ||--o{ SESSAO : "acessa via"
   USUARIO_PAINEL ||--o{ SESSAO : "acessa via"
   AGENDAMENTO ||--o{ NOTIFICACAO : gera
+  EMPRESA ||--o| WHATSAPP_CONEXAO : "envia por"
   CLIENTE ||--o{ CODIGO_VERIFICACAO : recebe
   EMPRESA ||--o{ IMPORTACAO : registra
   IMPORTACAO ||--o{ CLIENTE : "trouxe"
@@ -130,7 +131,10 @@ id (token aleatório, guardado como hash), tipo (`cliente` \| `painel`), cliente
 id, empresa_id, telefone, codigo_hash, expira_em, tentativas, usado.
 
 ### notificacao
-id, empresa_id, agendamento_id null, canal (`whatsapp` \| `sms` \| `email`), destino, mensagem, status (`pendente` \| `enviado` \| `falhou`), criado_em, enviado_em.
+id, empresa_id, agendamento_id null, canal (`whatsapp` \| `sms` \| `email`), **tipo** (`confirmacao` \| `lembrete` \| `codigo` \| `cancelamento` \| `remarcacao` \| `aviso_empresa` \| `teste`), destino, mensagem, **parametros** jsonb (variáveis do modelo; apagadas após o envio do código), status (`pendente` \| `nao_enviado` \| `aceito` \| `enviado` \| `entregue` \| `lido` \| `falhou`), **provedor_msg_id** (wamid, único), **erro**, criado_em, enviado_em, atualizado_em.
+
+### whatsapp_conexao (v4 · 1:1 empresa)
+empresa_id PK/FK, **phone_number_id UNIQUE** (um número só pode servir a uma barbearia), waba_id, numero_exibicao, nome_verificado, **token_cifrado** (AES-256-GCM), app_secret_cifrado null, idioma (`pt_BR`), modelo_confirmacao (+ `_params`), modelo_lembrete (+ `_params`), modelo_codigo (+ `_botao`), lembretes_ativos, status (`conectado` \| `erro`), ultimo_erro, verificado_em, ultimo_webhook_em, criado_em. Sem acesso pela API do Supabase (RLS sem políticas): só o servidor lê.
 
 ### importacao (v3)
 id, empresa_id, usuario_id, fonte (`arquivo`; futuramente o id do conector de API), formato (`csv` | `xlsx` | `api`), arquivo_nome, status (`rascunho` | `concluida` | `cancelada`), total_linhas, colunas jsonb, **linhas jsonb (só enquanto rascunho)**, mapeamento jsonb, politica_duplicados (`manter` | `completar`), resultado jsonb (contagens + erros por número de linha), criado_em, concluido_em.

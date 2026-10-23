@@ -326,9 +326,9 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
   }
 
   async function pedirCodigo() {
-    let r: { reenvioEmSegundos: number; codigoDev?: string };
+    let r: { reenvioEmSegundos: number; codigoDev?: string; enviado?: boolean };
     try {
-      r = await api<{ reenvioEmSegundos: number; codigoDev?: string }>(`${base}/codigo`, { json: { telefone } });
+      r = await api<{ reenvioEmSegundos: number; codigoDev?: string; enviado?: boolean }>(`${base}/codigo`, { json: { telefone } });
     } catch (e) {
       if ((e as { status?: number }).status !== 429) throw e;
       // já existe um código recente: segue para a etapa do código
@@ -340,7 +340,11 @@ function Login({ slug, onEntrou }: { slug: string; onEntrou: () => void }) {
     setReenvio(r.reenvioEmSegundos);
     setEtapa("codigo");
     setInfo(
-      `Enviamos um código de 6 dígitos para o seu WhatsApp.${r.codigoDev ? ` (Modo demonstração: o código é ${r.codigoDev})` : ""}`,
+      `${
+        r.enviado
+          ? "Enviamos um código de 6 dígitos para o seu WhatsApp."
+          : "Não foi possível enviar o código pelo WhatsApp agora. Fale com a barbearia ou use o link do seu agendamento."
+      }${r.codigoDev ? ` (Modo demonstração: o código é ${r.codigoDev})` : ""}`,
     );
   }
 

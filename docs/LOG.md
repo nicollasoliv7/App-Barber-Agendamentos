@@ -137,7 +137,41 @@ Teste final no seu PC: o cliente fictício "Paulo Teste Windows" agendou Barba �
 - O aviso de cookies só aparece quando a empresa usa pixel de campanha, que é o único rastreamento da página.
 
 **Pendências (externas)**
-1. Provedor de WhatsApp (`WHATSAPP_API_URL`) e `APP_URL` para os links nas mensagens.
+1. ~~Provedor de WhatsApp~~ → feito na v4 (API oficial da Meta). Falta só configurar as contas (ver docs/WHATSAPP.md) e `APP_URL`.
 2. Provedor de pagamento real (hoje só sandbox).
 3. Conectores de importação por API, quando os sistemas de origem oferecerem API.
 4. Painel de referência: continua dependendo de login para completar o mapeamento B1–B16.
+
+
+---
+
+## v4 — Integração com o WhatsApp (API oficial da Meta) · 22/10/2026
+
+**O que foi feito**
+- **Conexão por barbearia** (`/painel/whatsapp`): Phone Number ID + WABA ID + token permanente, verificados na Meta na hora. O token é guardado criptografado (AES-256-GCM) e nunca volta para a tela. Inclui "Testar conexão", "Enviar teste" e "Desconectar", com status claro: Não conectado, Conectado · falta o modelo, Conectado ou Erro na conexão.
+- **Envios automáticos** pela WhatsApp Cloud API com modelos aprovados: confirmação ao agendar (ou ao pagar o Pix), lembrete opcional e código de verificação do histórico. O envio acontece **após o commit** (`tx().depois`), sem segurar locks e sem desfazer o agendamento em caso de falha.
+- **Webhook** `/api/whatsapp/webhook`: verificação da Meta e status enviado, entregue, lido e falhou, só com assinatura válida. O status nunca regride e há isolamento por número.
+- **Honestidade**:
+  - removido o envio "simulado" que marcava tudo como `enviado`; mensagens antigas desse tipo foram migradas para `nao_enviado`;
+  - a página pública só diz "a caminho do seu WhatsApp" quando a Meta aceitou;
+  - o histórico do cliente só diz "enviamos o código" quando ele saiu de verdade.
+- **Envio manual**: botão WhatsApp (`wa.me` com a mensagem pronta) na Agenda, em Agendamentos e em Notificações. Na página pública, o cliente tem "Avisar a barbearia pelo WhatsApp".
+- **Banco**: tabela `whatsapp_conexao` e novas colunas em `notificacao`; migration `supabase/migrations/20261022210000_whatsapp.sql`.
+- **Testes**:
+  - `e2e/whatsapp.mjs` com mock da Graph API: 42 verificações aprovadas;
+  - suites antigas (`fluxo-completo`, `pix-e-historico`, `responsivo`) aprovadas;
+  - migração de banco antigo verificada;
+  - lint, tipos e build limpos.
+
+**Decisões**
+- "Cada barbeiro conecta o próprio WhatsApp" foi implementado **por barbearia** (empresa), que é quem tem o número comercial e o cadastro na Meta. Um número por profissional pode vir depois, com a mesma tabela.
+- A conexão é feita colando as credenciais (o mais simples e compatível hoje). O **Embedded Signup** da Meta fica como próximo passo para escalar.
+- `WHATSAPP_API_URL` (provedor genérico global) foi **removido**: enviaria mensagens de todas as barbearias por um número só, contrariando o requisito.
+- Cancelamento, remarcação e aviso à barbearia não têm modelo próprio ainda: ficam registrados como "Não enviada", com o botão de envio manual.
+
+**Pendências (externas — dependem de você)**
+1. Criar o app na Meta e definir `WHATSAPP_CHAVE_CRIPTO`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` e `APP_URL` no servidor.
+2. Publicar o app (Vercel) para a Meta conseguir chamar o webhook.
+3. Por barbearia: número verificado, token permanente, modelos aprovados e conexão no painel.
+
+**Próximo passo exato**: autorizar o acesso da Vercel e publicar; depois seguir `docs/WHATSAPP.md`, parte A.

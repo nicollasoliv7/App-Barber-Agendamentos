@@ -12,3 +12,14 @@ node e2e/responsivo.mjs         # nenhuma página estoura a largura em 1440, 102
 ```
 
 `BASE_URL` muda o endereço (padrão `http://localhost:3000`). Os arquivos em `e2e/dados/` são fictícios e incluem erros de propósito (telefone vazio, e-mail inválido, CPF inválido, linha repetida) para testar o relatório da importação.
+
+## WhatsApp (sem falar com a Meta)
+
+```bash
+node e2e/mock-meta.mjs &                         # Graph API falsa na porta 4010
+PGLITE_DIR=.data/pglite node e2e/outra-barbearia.mjs   # com o app parado: cria a 2ª barbearia (isolamento)
+WHATSAPP_GRAPH_URL=http://localhost:4010 WHATSAPP_CHAVE_CRIPTO=chave-de-teste-com-mais-de-32-caracteres \
+WHATSAPP_APP_SECRET=segredo-do-app-de-teste WHATSAPP_WEBHOOK_VERIFY_TOKEN=verifica-webhook-teste \
+APP_URL=http://localhost:3300 PORT=3300 MODO_DEMO=1 LEMBRETE_HORAS_ANTES=72 CRON_SECRET=cron-teste npm run dev
+CRON_SECRET=cron-teste node e2e/whatsapp.mjs     # 42 verificações
+```

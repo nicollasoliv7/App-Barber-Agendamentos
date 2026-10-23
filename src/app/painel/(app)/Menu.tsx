@@ -14,6 +14,7 @@ const itens = [
   ["/painel/horarios", "Horários", "relogio"],
   ["/painel/bloqueios", "Folgas e bloqueios", "bloqueio"],
   ["/painel/financeiro", "Financeiro", "dinheiro"],
+  ["/painel/whatsapp", "WhatsApp", "whatsapp"],
   ["/painel/notificacoes", "Notificações", "sino"],
   ["/painel/configuracoes", "Configurações", "engrenagem"],
 ] as const;

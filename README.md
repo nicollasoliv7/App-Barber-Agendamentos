@@ -4,7 +4,7 @@ SaaS de agendamento para barbearias: **agendamento público sem login** (link pa
 
 | Funciona de verdade | Depende de configuração externa |
 |---|---|
-| Agendamento público, "sem preferência", remarcar/cancelar pelo link, `.ics` | Envio real de WhatsApp (`WHATSAPP_API_URL`); sem ele, as mensagens só ficam registradas |
+| Agendamento público, "sem preferência", remarcar/cancelar pelo link, `.ics` | WhatsApp automático: cada barbearia conecta o próprio número na API oficial da Meta ([docs/WHATSAPP.md](docs/WHATSAPP.md)). Sem isso, há envio manual pelo WhatsApp do barbeiro |
 | Painel, CRM, relatórios, exportação CSV | Pagamento real (hoje só sandbox: nenhum valor é cobrado) |
 | Importação CSV/Excel com validação e duplicados | Integrações de importação por API (estrutura pronta, nenhum conector) |
 | Banco embutido ou Supabase com RLS | Link absoluto nas mensagens (`APP_URL`) |
@@ -44,8 +44,8 @@ Quem usa a CLI do Supabase pode rodar `supabase db push`, que aplica a mesma mig
 | `DATABASE_URL` | Usar Postgres/Supabase em vez do banco embutido |
 | `SEED=0` | Não criar a empresa de exemplo num banco vazio |
 | `APP_URL` | Endereço público do app (ex.: `https://agenda.suabarbearia.com.br`), usado nos links das mensagens |
-| `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN` | Enviar notificações de verdade (sem isso, ficam registradas no painel) |
-| `CRON_SECRET` | Proteger `POST /api/cron/expirar` |
+| `WHATSAPP_CHAVE_CRIPTO`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Integração com o WhatsApp (API oficial). Cada barbearia conecta o número no painel → WhatsApp. Ver [docs/WHATSAPP.md](docs/WHATSAPP.md) |
+| `CRON_SECRET` | Proteger `POST /api/cron/expirar` e `POST /api/cron/lembretes` |
 | `PAGAMENTOS_SANDBOX=0` | Desliga o botão de simular pagamento |
 | `LEMBRETE_HORAS_ANTES` | Quantas horas antes enviar o lembrete (padrão 3) |
 | `ROTINAS_INTERNAS=0` | Desliga as rotinas de 1 em 1 minuto (use as rotas `/api/cron/*` em serverless) |

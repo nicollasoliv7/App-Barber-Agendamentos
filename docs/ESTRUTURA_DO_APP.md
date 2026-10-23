@@ -9,7 +9,7 @@
 | Banco | **PostgreSQL**: **PGlite** local (Postgres em WASM, sem instalar nada) ou **Supabase** via `DATABASE_URL` | O Supabase local exige Docker. O schema é o mesmo nos dois |
 | Auth | Sessões próprias (cookie httpOnly + tabela `sessao`, senha com scrypt) | Funciona sem Supabase. O cliente entra por telefone + senha + código, como na referência. Migrar para o Supabase Auth fica como pendência no LOG |
 | Pagamentos | Provedor **sandbox** interno (Pix fictício com QR e cartão tokenizado) | Regra do projeto: somente modo de teste |
-| Notificações | Tabela `notificacao` + envio simulado (console). Envio real via `WHATSAPP_API_URL` | Sem provedor real no MVP |
+| Notificações | WhatsApp Cloud API (oficial da Meta), **um número por barbearia** (`whatsapp_conexao`, token criptografado). Status reais via webhook assinado. Sem conexão: nada é enviado e há envio manual (`wa.me`) | Ver `docs/WHATSAPP.md` |
 
 Não há ORM: o SQL é escrito à mão por uma camada fina (`src/lib/db.ts`) que expõe a mesma interface para PGlite e `pg`.
 
@@ -90,7 +90,8 @@ A página pública usa a mesma base, mas a cor de ação e a aurora vêm do **te
 | `/painel/horarios` | dono | B6 |
 | `/painel/bloqueios` | dono | B7 |
 | `/painel/financeiro` | dono | B8, B9, B10 |
-| `/painel/notificacoes` | dono | B14 |
+| `/painel/whatsapp` | dono/admin | Conectar número, modelos, teste, webhook, desconectar (v4) |
+| `/painel/notificacoes` | dono | B14 — com status real e botão de envio manual |
 | `/painel/configuracoes` | dono | B11, B12, B13, B15 (+ campos personalizados, cadastro de unidades) |
 
 ## 4. Endpoints (route handlers)
@@ -129,6 +130,8 @@ A página pública usa a mesma base, mas a cor de ação e a aurora vêm do **te
 | POST | `/{id}/simular` | aprova (só no sandbox) |
 | POST | `/{id}/cancelar` | cancela a cobrança e, se o pagamento era obrigatório, o agendamento |
 | POST | `/cartao` | paga com cartão salvo (o final 0002 é recusado) |
+
+**WhatsApp**: `GET/POST /api/whatsapp/webhook` (verificação da Meta e status de entrega, com assinatura `X-Hub-Signature-256`). Ações do painel em `src/app/painel/acoes-whatsapp.ts`; núcleo em `src/lib/whatsapp.ts` e `src/lib/notificacoes.ts`.
 
 **Sistema**: `POST /api/cron/expirar` (R18) e `POST /api/cron/lembretes` (R14b), ambos protegidos por `CRON_SECRET` quando ele está definido. Localmente, `src/instrumentation.ts` executa as duas rotinas a cada minuto (para desligar, `ROTINAS_INTERNAS=0`).
 

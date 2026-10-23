@@ -7,12 +7,16 @@ import { filtrosParaQuery, lerFiltros, whereAgendamentos } from "@/lib/relatorio
 import { formatarDataHora, instanteLocal, reais, somarDias } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
 import { Icone, StatusBadge, Vazio } from "@/components/ui";
+import { linkGerenciar } from "@/lib/agendamentos";
+import { linkWhatsapp, textoConfirmacao } from "@/lib/mensagens";
 import { mudarStatus } from "../../acoes";
 import { Cabecalho } from "../../Form";
 import Filtros from "../../componentes/Filtros";
 
 export const metadata = { title: "Agendamentos" };
 const POR_PAGINA = 25;
+/** horário ainda não chegou (fora do render, para manter o componente puro) */
+const aindaVai = (d: Date) => new Date(d).getTime() > Date.now();
 
 type Linha = {
   id: string;
@@ -26,6 +30,7 @@ type Linha = {
   telefone: string;
   servico: string;
   profissional: string;
+  token_publico: string;
 };
 
 const PERIODOS = [
@@ -51,7 +56,7 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
 
   const [linhas, [tot], servicos, profissionais] = await Promise.all([
     q<Linha>(
-      `select a.id, a.inicio, a.status, a.origem, a.preco_centavos, a.cliente_id,
+      `select a.id, a.inicio, a.status, a.origem, a.preco_centavos, a.cliente_id, a.token_publico,
               coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago,
               c.nome as cliente, c.telefone, s.nome as servico, pr.nome as profissional
        from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id join profissional pr on pr.id = a.profissional_id
@@ -121,6 +126,28 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
                   <td className="text-right">
                     {(a.status === "confirmado" || a.status === "pendente_pagamento") && (
                       <div className="flex justify-end gap-1">
+                        {a.status === "confirmado" && aindaVai(a.inicio) && (
+                          <a
+                            href={linkWhatsapp(
+                              a.telefone,
+                              textoConfirmacao({
+                                cliente: a.cliente,
+                                empresa: u.empresa_nome,
+                                servico: a.servico,
+                                profissional: a.profissional,
+                                quando: formatarDataHora(a.inicio, cfg.fuso_horario),
+                                link: linkGerenciar(u.empresa_slug, a),
+                              }),
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-sutil btn-sm"
+                            title="Enviar confirmação pelo meu WhatsApp"
+                          >
+                            <Icone nome="whatsapp" tamanho={13} />
+                            <span className="sr-only">Enviar confirmação pelo WhatsApp</span>
+                          </a>
+                        )}
                         <form action={mudarStatus}>
                           <input type="hidden" name="id" value={a.id} />
                           <input type="hidden" name="status" value="concluido" />

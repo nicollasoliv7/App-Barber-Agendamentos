@@ -11,6 +11,8 @@ import path from "node:path";
 export type Row = Record<string, unknown>;
 export interface Executor {
   query<T = Row>(sql: string, params?: unknown[]): Promise<T[]>;
+  /** Agenda uma tarefa para DEPOIS do commit (ex.: chamada à API do WhatsApp). Só existe dentro de tx(). */
+  depois?: (fn: () => Promise<unknown>) => void;
 }
 interface Driver extends Executor {
   transaction<T>(fn: (tx: Executor) => Promise<T>): Promise<T>;
@@ -111,6 +113,19 @@ export async function q1<T = Row>(sql: string, params: unknown[] = []): Promise<
   return (await q<T>(sql, params))[0];
 }
 
+/**
+ * Transação. Tarefas registradas com t.depois() rodam só após o commit
+ * (chamadas de rede não seguram locks e não rodam se a transação falhar).
+ */
 export async function tx<T>(fn: (t: Executor) => Promise<T>): Promise<T> {
-  return (await db()).transaction(fn);
+  const depois: (() => Promise<unknown>)[] = [];
+  const out = await (await db()).transaction((t) => fn(Object.assign(t, { depois: (f: () => Promise<unknown>) => void depois.push(f) })));
+  for (const f of depois) {
+    try {
+      await f();
+    } catch (e) {
+      console.error("[agendou] tarefa pós-commit falhou:", e);
+    }
+  }
+  return out;
 }

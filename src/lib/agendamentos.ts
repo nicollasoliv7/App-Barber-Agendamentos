@@ -7,6 +7,7 @@ import { formatarDataHora, instanteLocal, paraMinutos, reais } from "./tempo";
 import { ErroNegocio, type Agendamento, type CampoPersonalizado } from "./tipos";
 import { cnpjValido, cpfValido, dataValida, formatarTelefone, normalizarTelefone } from "./validacao";
 import { tokenAleatorio } from "./senha";
+import { parametrosModelo, textoConfirmacao, type DadosMensagem } from "./mensagens";
 
 export interface NovoAgendamento {
   empresaId: string;
@@ -158,17 +159,27 @@ export async function notificarConfirmacao(
   },
 ) {
   const quando = formatarDataHora(ag.inicio);
-  const link = linkGerenciar(info.empresa.slug, ag);
+  const dados: DadosMensagem = {
+    cliente: info.cliente,
+    empresa: info.empresa.nome,
+    servico: info.servico,
+    profissional: info.profissional,
+    quando,
+    link: linkGerenciar(info.empresa.slug, ag),
+  };
   await notificar(t, {
     empresaId: ag.empresa_id,
     agendamentoId: ag.id,
     destino: info.telefone,
-    mensagem: `Olá, ${info.cliente.split(" ")[0]}! Seu horário na ${info.empresa.nome} está confirmado: ${info.servico} com ${info.profissional}, ${quando}. Valor: ${reais(ag.preco_centavos)}.${link ? ` Para remarcar ou cancelar: ${link}` : ""}`,
+    tipo: "confirmacao",
+    mensagem: `${textoConfirmacao(dados)} Valor: ${reais(ag.preco_centavos)}.`,
+    parametros: parametrosModelo(dados),
   });
   if (info.empresa.telefone_whatsapp) {
     await notificar(t, {
       empresaId: ag.empresa_id,
       agendamentoId: ag.id,
+      tipo: "aviso_empresa",
       destino: info.empresa.telefone_whatsapp,
       mensagem: `Novo agendamento: ${info.cliente} (${formatarTelefone(info.telefone)}) — ${info.servico} com ${info.profissional}, ${quando}.`,
     });
@@ -214,6 +225,7 @@ export async function cancelarPeloCliente(id: string, clienteId: AcessoCliente) 
       empresaId: ag.empresa_id,
       agendamentoId: id,
       destino: ag.cliente_telefone,
+      tipo: "cancelamento",
       mensagem: `Seu agendamento de ${ag.servico_nome} em ${formatarDataHora(ag.inicio)} foi cancelado.`,
     });
   });
@@ -240,6 +252,7 @@ export async function remarcarPeloCliente(id: string, clienteId: AcessoCliente, 
       empresaId: ag.empresa_id,
       agendamentoId: id,
       destino: ag.cliente_telefone,
+      tipo: "remarcacao",
       mensagem: `Seu ${ag.servico_nome} foi remarcado de ${antigo} para ${formatarDataHora(inicio)}.`,
     });
   });
