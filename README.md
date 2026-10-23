@@ -56,6 +56,8 @@ Quem usa a CLI do Supabase pode rodar `supabase db push`, que aplica a mesma mig
 ## Verificações
 ```bash
 npm run lint && npx tsc --noEmit && npm run build
+npm run lint:typed   # lint com tipos (mais lento, ~20 s); fora do CI
+# quality gates: eslint-rules/*.cjs (teto de 350 linhas, sem console direto, sem banco nas telas) — baseline em docs/LOG.md
 ```
 O GitHub Actions (`.github/workflows/ci.yml`) roda essas três verificações a cada push.
 

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:typed": "eslint --config eslint.typed.config.mjs ."
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",

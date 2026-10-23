@@ -228,3 +228,49 @@ Teste final no seu PC: o cliente fictício "Paulo Teste Windows" agendou Barba �
 3. Itens anteriores: deploy na Vercel (autorização do time), contas da Meta para o WhatsApp, painel de referência.
 
 **Próximo passo exato**: publicar (Vercel) e criar o primeiro plano real em `/painel/planos`.
+
+---
+
+## Quality gates do ESLint (vibe-coding-toolkit, prompt 08) · 22/10/2026
+
+**O que foi feito**
+- **Regras copiadas:** os 3 arquivos de `eslint-rules/*.cjs` foram copiados **byte a byte** do vibe-coding-toolkit (`templates/eslint`). O `verify.mjs` respondeu 3× "ok" e depois foi apagado.
+- **Configuração:** `eslint.config.mjs` mantém a config do Next que já existia (core-web-vitals + typescript) e acrescenta, para `src/**`, três regras:
+  - `quality/max-lines`, com teto de 350 linhas;
+  - `quality/no-direct-console`;
+  - `quality/no-direct-data-access`, aplicada aos módulos `@/lib/db` (`db`, `q`, `q1`, `tx`) nas camadas `src/app/` e `src/components/` e nos arquivos `.tsx`.
+- **Lint com tipos:** `eslint.typed.config.mjs` liga o projectService e as regras de promessas e "unsafe".
+- **Scripts:** `lint` (`eslint .`), `lint:fix` e `lint:typed`.
+
+**Medição (baseline)**
+
+| Regra | Violações | Severidade |
+|---|---|---|
+| `quality/max-lines` (350) | 7 arquivos | warn |
+| `quality/no-direct-data-access` | 33 imports em 32 arquivos | warn |
+| `quality/no-direct-console` | 9 | warn |
+| Typed: `no-misused-promises` | 26 | warn |
+| Typed: `no-floating-promises` | 11 | warn |
+| Typed: `no-unsafe-member-access` | 11 | warn |
+| Typed: `no-unsafe-argument` | 9 | warn |
+| Typed: `no-unsafe-assignment` | 2 | warn |
+| Typed: `require-await` | 2 | warn |
+| Demais regras typed (sem violações) | 0 | error |
+
+Arquivos acima de 350 linhas:
+- 625 `src/app/[slug]/Agendar.tsx`
+- 471 `src/app/[slug]/Historico.tsx`
+- 430 `src/app/painel/(app)/clientes/importar/Importador.tsx`
+- 428 `src/app/painel/acoes.ts`
+- 411 `src/lib/planos.ts`
+- 356 `src/app/painel/(app)/planos/page.tsx`
+- 352 `src/lib/agendamentos.ts`
+
+**Decisões**
+- **Não incluídos os presets `js.configs.recommended` / `tseslint.configs.strict` e o bloco de complexidade do exemplo:** o projeto já usa as regras do Next + typescript-eslint, e a tarefa era instalar os 3 gates. Por isso `@eslint/js` e `typescript-eslint` não foram instalados à parte: o parser e o plugin vêm do `eslint-config-next`.
+- **Bloco `import-x` removido:** o projeto ainda não tem camadas declaradas além da fronteira do banco, que já é coberta por `quality/no-direct-data-access`.
+- **Bloco "off" do console removido:** não existe módulo de log.
+- **Fora do CI:** o lint com tipos leva cerca de 20 s e usa cerca de 0,9 GB de pico. O CI continua rodando só `npm run lint`.
+- **Nenhuma violação foi corrigida** (instalar e medir era o escopo).
+
+**Próximo passo**: dividir os 7 arquivos grandes (prompt 09 do toolkit) e, ao zerar cada contagem, voltar a regra para "error".
