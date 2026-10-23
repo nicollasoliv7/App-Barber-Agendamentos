@@ -23,19 +23,16 @@ const eslintConfig = defineConfig([
     files: ["src/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}"],
     plugins: { quality },
     rules: {
-      // Cada regra nova com violações começa em "warn", com a contagem medida na
-      // instalação (22/10/2026) como baseline. A migração termina quando a contagem
-      // chega a zero e a regra volta para "error". Não aumente o teto de linhas.
-      //
-      // Baseline: 7 arquivos acima de 350 linhas.
-      "quality/max-lines": ["warn", { max: 350 }],
-      // Baseline: 9 chamadas de console → 0 (todas passam por src/lib/log.ts).
-      "quality/no-direct-console": ["warn", { logger: "log.info() / log.erro() de @/lib/log" }],
-      // Baseline: 33 imports do cliente do banco (@/lib/db: db, q, q1, tx) em 32 arquivos
-      // de src/app (páginas, rotas e ações consultam o banco direto). Alvo: passar por
-      // funções de src/lib (repositórios/serviços).
+      // As três regras começaram em "warn" com baseline medido na instalação (22/10/2026:
+      // 7 arquivos grandes, 9 consoles, 33 imports do banco em src/app). Zeradas no mesmo
+      // dia e promovidas a "error": violação nova quebra o lint. Não aumente o teto de linhas.
+      "quality/max-lines": ["error", { max: 350 }],
+      // Logs do servidor passam por src/lib/log.ts (único arquivo liberado, bloco abaixo).
+      "quality/no-direct-console": ["error", { logger: "log.info() / log.erro() de @/lib/log" }],
+      // Páginas, rotas e server actions não importam @/lib/db: consultas ficam em
+      // src/lib/consultas (leitura) e src/lib/repositorios (gravação), sempre por empresa.
       "quality/no-direct-data-access": [
-        "warn",
+        "error",
         {
           modules: ["@/lib/db"],
           bindings: ["db", "q", "q1", "tx"],

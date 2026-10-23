@@ -274,3 +274,40 @@ Arquivos acima de 350 linhas:
 - **Nenhuma violação foi corrigida** (instalar e medir era o escopo).
 
 **Próximo passo**: dividir os 7 arquivos grandes (prompt 09 do toolkit) e, ao zerar cada contagem, voltar a regra para "error".
+
+## Burndown do lint: arquivos grandes + avisos restantes (prompts 09 e 02) · 22/10/2026
+
+**Resultado**: `npm run lint` está em 0 problemas. As três regras de qualidade passaram de "warn" para **"error"**, então uma violação nova quebra o lint e o CI.
+
+| Regra | Antes | Depois | Severidade |
+|---|---|---|---|
+| `quality/max-lines` (350) | 7 arquivos | 0 | error |
+| `quality/no-direct-console` | 9 chamadas | 0 | error |
+| `quality/no-direct-data-access` | 33 imports em 32 arquivos | 0 | error |
+
+**O que mudou**
+- **Arquivos grandes:**
+  - `Agendar.tsx`, `Historico.tsx` e `Importador.tsx` foram divididos em sub-componentes por etapa.
+  - `planos.ts` foi dividido em `planos-ciclos`, `planos-cobertura` e `planos-indicadores`.
+  - `agendamentos.ts` foi dividido em `agendamentos-cliente` e `agendamentos-empresa`.
+  - Os arquivos originais reexportam tudo, então quem já importava deles continua funcionando sem mudança.
+- **Log:** o novo `src/lib/log.ts` expõe `log.info` e `log.erro`, e é o único arquivo liberado para usar console.
+- **Banco:** nenhum arquivo de `src/app` importa `@/lib/db`.
+  - A leitura fica em `src/lib/consultas/`: publico, cliente, cadastros, historicos, agenda, clientes, planos e financeiro.
+  - A gravação fica em `src/lib/repositorios/`: servicos, profissionais, horarios, configuracoes, clientes e whatsapp-conexao.
+  - O SQL foi movido sem alterar a lógica. Toda função recebe `empresa_id`.
+
+**Verificação**
+- Lint: 0.
+- `tsc --noEmit`: limpo.
+- Build: ok.
+- Testes e2e: passaram as suítes planos, whatsapp, histórico (modais), fluxo-completo, pix-e-historico e responsivo.
+- Nenhum `eslint-disable` foi adicionado.
+
+**Pontos não mecânicos** (revisar se quiser)
+- `consultas/clientes.ts` ganhou fallbacks com `??` (`FILTRO_SEGMENTO[seg] ?? "true"` e `ORDEM_SQL[ordem] ?? ORDEM_SQL.recentes`). A página já valida as chaves, então esses fallbacks nunca são usados na prática.
+- `totalClientes()` agora retorna um número, e o dashboard foi ajustado para isso.
+
+**Fora do escopo**: os 61 avisos de `npm run lint:typed` (regras com tipos) continuam em "warn".
+
+**Próximo passo**: zerar o `lint:typed`, se quiser. O deploy na Vercel ainda depende da sua aprovação do acesso ao time.
