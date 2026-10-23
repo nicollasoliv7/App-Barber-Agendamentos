@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { q, q1 } from "@/lib/db";
+import { fichaDoCliente, historicoDeAtendimentos, indicadoresDoCliente, servicosPreferidos } from "@/lib/consultas/clientes";
 import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone, isUuid } from "@/lib/validacao";
@@ -17,46 +17,12 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
   const u = await usuarioOuLogin();
   const { id } = await params;
   if (!isUuid(id)) notFound();
-  const c = await q1<{
-    id: string;
-    nome: string;
-    telefone: string;
-    email: string | null;
-    observacoes: string | null;
-    origem: string;
-    telefone_verificado: boolean;
-    dados_extras: Record<string, string>;
-    criado_em: Date;
-    arquivo_nome: string | null;
-  }>(
-    `select c.*, i.arquivo_nome from cliente c left join importacao i on i.id = c.importacao_id where c.id = $1 and c.empresa_id = $2`,
-    [id, u.empresa_id],
-  );
+  const c = await fichaDoCliente(id, u.empresa_id);
   if (!c) notFound();
   const [hist, [k], fav] = await Promise.all([
-    q<{ id: string; inicio: Date; status: string; preco_centavos: number; valor_coberto_centavos: number; servico: string; profissional: string; pago: number }>(
-      `select a.id, a.inicio, a.status, a.preco_centavos, a.valor_coberto_centavos, s.nome as servico, p.nome as profissional,
-              coalesce((select sum(valor_centavos) from pagamento pg where pg.agendamento_id = a.id and pg.status='pago'),0)::int as pago
-       from agendamento a join servico s on s.id = a.servico_id join profissional p on p.id = a.profissional_id
-       where a.cliente_id = $1 and a.empresa_id = $2 order by a.inicio desc limit 100`,
-      [id, u.empresa_id],
-    ),
-    q<{ visitas: number; visitas_pagas: number; gasto: number; faltas: number; cancelados: number; ultimo: Date | null; proximo: Date | null }>(
-      `select count(*) filter (where status='concluido')::int as visitas,
-              count(*) filter (where status='concluido' and preco_centavos > valor_coberto_centavos)::int as visitas_pagas,
-              coalesce(sum(preco_centavos - valor_coberto_centavos) filter (where status='concluido'),0)::int as gasto,
-              count(*) filter (where status='faltou')::int as faltas,
-              count(*) filter (where status='cancelado')::int as cancelados,
-              max(inicio) filter (where inicio < now() and status in ('concluido','confirmado')) as ultimo,
-              min(inicio) filter (where inicio >= now() and status in ('confirmado','pendente_pagamento')) as proximo
-       from agendamento where cliente_id = $1 and empresa_id = $2`,
-      [id, u.empresa_id],
-    ),
-    q<{ nome: string; qtd: number }>(
-      `select s.nome, count(*)::int as qtd from agendamento a join servico s on s.id = a.servico_id
-       where a.cliente_id = $1 and a.empresa_id = $2 and a.status in ('concluido','confirmado') group by s.nome order by qtd desc limit 3`,
-      [id, u.empresa_id],
-    ),
+    historicoDeAtendimentos(id, u.empresa_id),
+    indicadoresDoCliente(id, u.empresa_id),
+    servicosPreferidos(id, u.empresa_id),
   ]);
   const ticket = k.visitas_pagas ? Math.round(k.gasto / k.visitas_pagas) : 0; // atendimentos cobertos 100% pelo plano não entram
   const extras = Object.entries(c.dados_extras ?? {}).filter(([, v]) => v);

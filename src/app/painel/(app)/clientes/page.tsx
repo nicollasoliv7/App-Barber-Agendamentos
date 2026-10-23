@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { listarClientes } from "@/lib/consultas/clientes";
+import { totalClientes } from "@/lib/consultas/cadastros";
 import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora, reais } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
@@ -11,23 +12,6 @@ import { Cabecalho, Campo, Form } from "../../Form";
 
 export const metadata = { title: "Clientes" };
 const POR_PAGINA = 30;
-
-type C = {
-  id: string;
-  nome: string;
-  telefone: string;
-  email: string | null;
-  origem: string;
-  visitas: number;
-  faltas: number;
-  gasto: number;
-  ultimo: Date | null;
-  proximo: Date | null;
-  criado_em: Date;
-  recentes: number;
-  plano: string | null;
-  plano_status: string | null;
-};
 
 const SEGMENTOS = [
   ["todos", "Todos"],
@@ -55,43 +39,9 @@ export default async function Page({ searchParams }: PageProps<"/painel/clientes
   const seg = segmentos.some(([k]) => k === v("seg")) ? v("seg") : "todos";
   const ordem = ORDENS.some(([k]) => k === v("ordem")) ? v("ordem") : "recentes";
   const pagina = Math.max(0, Number(v("pagina")) || 0);
-  const filtroSeg: Record<string, string> = {
-    todos: "true",
-    proximo: "proximo is not null",
-    sumidos: "ultimo < now() - interval '45 days' and proximo is null",
-    novos: "criado_em >= now() - interval '30 days'",
-    importados: "origem = 'importacao'",
-    recorrentes: `recentes >= ${RECORRENTE_VISITAS}`,
-    assinantes: "plano is not null",
-  };
-  const ordemSql: Record<string, string> = {
-    recentes: "ultimo desc nulls last, nome",
-    gasto: "gasto desc, nome",
-    visitas: "visitas desc, nome",
-    nome: "nome",
-  };
-
-  const [clientes, [{ total }]] = await Promise.all([
-    q<C>(
-      `with base as (
-         select c.id, c.nome, c.telefone, c.email, c.origem, c.criado_em,
-                count(a.id) filter (where a.status = 'concluido')::int as visitas,
-                count(a.id) filter (where a.status = 'faltou')::int as faltas,
-                coalesce(sum(a.preco_centavos - a.valor_coberto_centavos) filter (where a.status = 'concluido'),0)::int as gasto,
-                count(a.id) filter (where a.status = 'concluido' and a.inicio >= now() - interval '90 days' and a.inicio <= now())::int as recentes,
-                (select p.nome from assinatura s join plano p on p.id = s.plano_id where s.cliente_id = c.id and s.status <> 'cancelada' limit 1) as plano,
-                (select s.status from assinatura s where s.cliente_id = c.id and s.status <> 'cancelada' limit 1) as plano_status,
-                max(a.inicio) filter (where a.inicio < now() and a.status in ('concluido','confirmado')) as ultimo,
-                min(a.inicio) filter (where a.inicio >= now() and a.status in ('confirmado','pendente_pagamento')) as proximo
-         from cliente c left join agendamento a on a.cliente_id = c.id
-         where c.empresa_id = $1
-           and ($2 = '' or c.nome ilike '%' || $2 || '%' or c.email ilike '%' || $2 || '%'
-                or c.telefone like '%' || nullif(regexp_replace($2, '\\D', '', 'g'), '') || '%')
-         group by c.id)
-       select * from base where ${filtroSeg[seg]} order by ${ordemSql[ordem]} limit ${POR_PAGINA + 1} offset ${pagina * POR_PAGINA}`,
-      [u.empresa_id, busca],
-    ),
-    q<{ total: number }>(`select count(*)::int as total from cliente where empresa_id = $1`, [u.empresa_id]),
+  const [clientes, total] = await Promise.all([
+    listarClientes(u.empresa_id, busca, seg, ordem, POR_PAGINA + 1, pagina * POR_PAGINA),
+    totalClientes(u.empresa_id),
   ]);
   const temMais = clientes.length > POR_PAGINA;
   const link = (extra: Record<string, string>) => {

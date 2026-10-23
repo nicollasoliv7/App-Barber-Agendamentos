@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { assinantes, clientesParaBusca, planosDaEmpresa, servicosAtivosComPreco, type PlanoComServicos } from "@/lib/consultas/planos";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { PERIODOS, resumoPlanos, STATUS_ASSINATURA, TOLERANCIA_DIAS } from "@/lib/planos";
@@ -14,17 +14,6 @@ export const metadata = { title: "Planos" };
 const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 const paraReais = (c: number) => (c / 100).toFixed(2).replace(".", ",");
 
-type Plano = {
-  id: string;
-  nome: string;
-  descricao: string | null;
-  beneficios: string | null;
-  preco_centavos: number;
-  periodo_meses: number;
-  ativo: boolean;
-  assinantes: number;
-  servicos: { servico_id: string; nome: string; limite_por_ciclo: number | null; valor_cliente_centavos: number }[];
-};
 
 export default async function Page({ searchParams }: PageProps<"/painel/planos">) {
   const u = await usuarioOuLogin();
@@ -38,27 +27,10 @@ export default async function Page({ searchParams }: PageProps<"/painel/planos">
 
   const resumo = await resumoPlanos(u.empresa_id, iniMes, fimMes); // também sincroniza ciclos e status
   const [planos, servicos, assinaturas, clientes] = await Promise.all([
-    q<Plano>(
-      `select p.id, p.nome, p.descricao, p.beneficios, p.preco_centavos, p.periodo_meses, p.ativo,
-              (select count(*) from assinatura a where a.plano_id = p.id and a.status <> 'cancelada')::int as assinantes,
-              coalesce((select json_agg(json_build_object('servico_id', s.id, 'nome', s.nome, 'limite_por_ciclo', ps.limite_por_ciclo,
-                                                          'valor_cliente_centavos', ps.valor_cliente_centavos) order by s.ordem, s.nome)
-                        from plano_servico ps join servico s on s.id = ps.servico_id where ps.plano_id = p.id), '[]'::json) as servicos
-       from plano p where p.empresa_id = $1 order by p.ativo desc, p.nome`,
-      [u.empresa_id],
-    ),
-    q<{ id: string; nome: string; preco_centavos: number }>(`select id, nome, preco_centavos from servico where empresa_id = $1 and ativo order by ordem, nome`, [
-      u.empresa_id,
-    ]),
-    q<{ id: string; cliente_id: string; cliente: string; telefone: string; plano: string; status: string; ciclo_fim: string; preco_centavos: number; periodo_meses: number; usos: number }>(
-      `select a.id, c.id as cliente_id, c.nome as cliente, c.telefone, p.nome as plano, a.status, a.ciclo_fim::text as ciclo_fim, a.preco_centavos, a.periodo_meses,
-              (select count(*) from assinatura_uso us where us.assinatura_id = a.id and us.ciclo_inicio = a.ciclo_inicio)::int as usos
-       from assinatura a join cliente c on c.id = a.cliente_id join plano p on p.id = a.plano_id
-       where a.empresa_id = $1 and (case when $2 = 'abertas' then a.status <> 'cancelada' else a.status = $2 end)
-       order by case a.status when 'inadimplente' then 0 when 'pendente' then 1 when 'ativa' then 2 else 3 end, a.ciclo_fim, c.nome limit 200`,
-      [u.empresa_id, filtro],
-    ),
-    q<{ nome: string; telefone: string }>(`select nome, telefone from cliente where empresa_id = $1 order by nome limit 2000`, [u.empresa_id]),
+    planosDaEmpresa(u.empresa_id),
+    servicosAtivosComPreco(u.empresa_id),
+    assinantes(u.empresa_id, filtro),
+    clientesParaBusca(u.empresa_id),
   ]);
   const ativos = planos.filter((p) => p.ativo);
 
@@ -283,7 +255,7 @@ export default async function Page({ searchParams }: PageProps<"/painel/planos">
   );
 }
 
-function FormPlano({ plano, servicos }: { plano?: Plano; servicos: { id: string; nome: string; preco_centavos: number }[] }) {
+function FormPlano({ plano, servicos }: { plano?: PlanoComServicos; servicos: { id: string; nome: string; preco_centavos: number }[] }) {
   const inc = new Map(plano?.servicos.map((s) => [s.servico_id, s]) ?? []);
   return (
     <Form action={salvarPlanoAcao} botao={plano ? "Salvar plano" : "Criar plano"} resetar={!plano} className="mt-3 grid gap-3">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { estatisticasDeEnvio } from "@/lib/consultas/historicos";
 import { usuarioOuLogin } from "@/lib/painel";
 import { origemApp } from "@/lib/origem";
 import { formatarDataHora } from "@/lib/tempo";
@@ -39,14 +39,7 @@ export default async function Page() {
   const [c, origem, [stats]] = await Promise.all([
     conexaoPublica(u.empresa_id),
     origemApp(),
-    q<{ aceitas: number; entregues: number; falhas: number; nao_enviadas: number }>(
-      `select count(*) filter (where status in ('aceito','enviado','entregue','lido'))::int as aceitas,
-              count(*) filter (where status in ('entregue','lido'))::int as entregues,
-              count(*) filter (where status = 'falhou')::int as falhas,
-              count(*) filter (where status = 'nao_enviado')::int as nao_enviadas
-       from notificacao where empresa_id = $1 and criado_em > now() - interval '30 days'`,
-      [u.empresa_id],
-    ),
+    estatisticasDeEnvio(u.empresa_id),
   ]);
   const servidorPronto = criptografiaPronta();
   const webhookPronto = !!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN && !!(process.env.WHATSAPP_APP_SECRET || c?.tem_app_secret);

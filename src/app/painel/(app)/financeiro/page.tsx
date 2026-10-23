@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { atendimentosAReceber, comissoesDoPeriodo, mensalidadesEmAberto, recebimentosPorForma, servicosDoPeriodo, totaisAtendimentos } from "@/lib/consultas/financeiro";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
-import { SALDO, VALOR } from "@/lib/relatorios";
 import { METODOS, sincronizarEmpresa, usaPlanos } from "@/lib/planos";
 import { diaLocal, formatarDataHora, instanteLocal, reais, somarDias } from "@/lib/tempo";
 import { registrarPagamentoLocal } from "../../acoes";
@@ -23,63 +22,16 @@ export default async function Page({ searchParams }: PageProps<"/painel/financei
   const ate = ok(sp.ate) ? sp.ate : hoje;
   const ini = instanteLocal(de, 0, cfg.fuso_horario);
   const fim = instanteLocal(somarDias(ate, 1), 0, cfg.fuso_horario);
-  const P = [u.empresa_id, ini, fim];
   const comPlanos = await usaPlanos(u.empresa_id);
   if (comPlanos) await sincronizarEmpresa(u.empresa_id);
 
   const [[tot], porMetodo, comissoes, porServico, pendentesAtend, mensalidades] = await Promise.all([
-    q<{ total: number; concluidos: number; cancelados: number; faltas: number; previsto: number; realizado: number; a_receber: number; cobertos: number; valor_coberto: number }>(
-      `select count(*)::int as total,
-              count(*) filter (where status='concluido')::int as concluidos,
-              count(*) filter (where status='cancelado')::int as cancelados,
-              count(*) filter (where status='faltou')::int as faltas,
-              coalesce(sum(${VALOR()}) filter (where status in ('confirmado','concluido')),0)::int as previsto,
-              coalesce(sum(${VALOR()}) filter (where status='concluido'),0)::int as realizado,
-              coalesce(sum(${SALDO()}) filter (where status='concluido'),0)::int as a_receber,
-              count(*) filter (where valor_coberto_centavos > 0 and status <> 'cancelado')::int as cobertos,
-              coalesce(sum(valor_coberto_centavos) filter (where status <> 'cancelado'),0)::int as valor_coberto
-       from agendamento a where empresa_id=$1 and inicio >= $2 and inicio < $3`,
-      P,
-    ),
-    // recebimentos reais: pagamentos de atendimentos + mensalidades pagas (fontes separadas, sem misturar com uso de benefício)
-    q<{ metodo: string; atendimentos: number; planos: number }>(
-      `select metodo, sum(atend)::int as atendimentos, sum(plano)::int as planos from (
-         select case when p.metodo = 'local' then 'local' else p.metodo end as metodo, p.valor_centavos as atend, 0 as plano
-         from pagamento p join agendamento a on a.id = p.agendamento_id
-         where a.empresa_id=$1 and p.status='pago' and p.pago_em >= $2 and p.pago_em < $3
-         union all
-         select ac.metodo, 0, ac.valor_centavos from assinatura_cobranca ac
-         where ac.empresa_id=$1 and ac.status='paga' and ac.pago_em >= $2 and ac.pago_em < $3
-       ) x group by metodo order by sum(atend + plano) desc`,
-      P,
-    ),
-    q<{ nome: string; pct: number; atendimentos: number; bruto: number }>(
-      `select pr.nome, pr.comissao_pct as pct, count(a.id)::int as atendimentos, coalesce(sum(a.preco_centavos),0)::int as bruto
-       from profissional pr left join agendamento a on a.profissional_id = pr.id and a.status='concluido' and a.inicio >= $2 and a.inicio < $3
-       where pr.empresa_id=$1 group by pr.id order by bruto desc`,
-      P,
-    ),
-    q<{ nome: string; qtd: number; valor: number }>(
-      `select s.nome, count(*)::int as qtd, sum(${VALOR()})::int as valor from agendamento a join servico s on s.id = a.servico_id
-       where a.empresa_id=$1 and a.inicio >= $2 and a.inicio < $3 and a.status in ('confirmado','concluido') group by s.nome order by valor desc`,
-      P,
-    ),
-    q<{ id: string; inicio: Date; cliente: string; servico: string; saldo: number }>(
-      `select a.id, a.inicio, c.nome as cliente, s.nome as servico, ${SALDO()}::int as saldo
-       from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
-       where a.empresa_id=$1 and a.inicio >= $2 and a.inicio < $3 and a.status = 'concluido' and ${SALDO()} > 0
-       order by a.inicio desc limit 15`,
-      P,
-    ),
-    comPlanos
-      ? q<{ id: string; vencimento: string; valor_centavos: number; cliente: string; cliente_id: string; plano: string; atrasada: boolean }>(
-          `select ac.id, ac.vencimento::text as vencimento, ac.valor_centavos, c.nome as cliente, c.id as cliente_id, p.nome as plano,
-                  ac.vencimento < $2::date as atrasada
-           from assinatura_cobranca ac join assinatura a on a.id = ac.assinatura_id join cliente c on c.id = a.cliente_id join plano p on p.id = a.plano_id
-           where ac.empresa_id = $1 and ac.status = 'pendente' order by ac.vencimento limit 30`,
-          [u.empresa_id, hoje],
-        )
-      : Promise.resolve([]),
+    totaisAtendimentos(u.empresa_id, ini, fim),
+    recebimentosPorForma(u.empresa_id, ini, fim),
+    comissoesDoPeriodo(u.empresa_id, ini, fim),
+    servicosDoPeriodo(u.empresa_id, ini, fim),
+    atendimentosAReceber(u.empresa_id, ini, fim),
+    comPlanos ? mensalidadesEmAberto(u.empresa_id, hoje) : Promise.resolve([]),
   ]);
   const recAtend = porMetodo.reduce((s, m) => s + m.atendimentos, 0);
   const recPlanos = porMetodo.reduce((s, m) => s + m.planos, 0);

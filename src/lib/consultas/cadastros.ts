@@ -56,3 +56,8 @@ export const bloqueiosFuturos = (empresaId: string) =>
 
 export const clientePorTelefone = (empresaId: string, telefone: string) =>
   q1<{ id: string }>(`select id from cliente where empresa_id = $1 and telefone = $2`, [empresaId, telefone]);
+
+export async function totalClientes(empresaId: string): Promise<number> {
+  const [{ total_clientes }] = await q<{ total_clientes: number }>(`select count(*)::int as total_clientes from cliente where empresa_id = $1`, [empresaId]);
+  return total_clientes;
+}

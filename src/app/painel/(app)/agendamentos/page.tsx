@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { agendamentosFiltrados, totaisFiltrados } from "@/lib/consultas/agenda";
+import { profissionaisOpcoes, servicosOpcoes } from "@/lib/consultas/cadastros";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
@@ -17,22 +18,6 @@ export const metadata = { title: "Agendamentos" };
 const POR_PAGINA = 25;
 /** horário ainda não chegou (fora do render, para manter o componente puro) */
 const aindaVai = (d: Date) => new Date(d).getTime() > Date.now();
-
-type Linha = {
-  id: string;
-  inicio: Date;
-  status: string;
-  origem: string;
-  preco_centavos: number;
-  pago: number;
-  cliente_id: string;
-  cliente: string;
-  telefone: string;
-  servico: string;
-  profissional: string;
-  token_publico: string;
-  valor_coberto_centavos: number;
-};
 
 const PERIODOS = [
   ["hoje", "Hoje"],
@@ -56,21 +41,10 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
   const ordem = f.periodo === "proximos" ? "a.inicio asc" : "a.inicio desc";
 
   const [linhas, [tot], servicos, profissionais] = await Promise.all([
-    q<Linha>(
-      `select a.id, a.inicio, a.status, a.origem, a.preco_centavos, a.cliente_id, a.token_publico, a.valor_coberto_centavos,
-              coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago,
-              c.nome as cliente, c.telefone, s.nome as servico, pr.nome as profissional
-       from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id join profissional pr on pr.id = a.profissional_id
-       where ${where} order by ${ordem} limit ${POR_PAGINA + 1} offset ${pagina * POR_PAGINA}`,
-      params,
-    ),
-    q<{ n: number; valor: number }>(
-      `select count(*)::int as n, coalesce(sum(a.preco_centavos - a.valor_coberto_centavos) filter (where a.status in ('confirmado','concluido')),0)::int as valor
-       from agendamento a where ${where}`,
-      params,
-    ),
-    q<{ id: string; nome: string }>(`select id, nome from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]),
-    q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 order by nome`, [u.empresa_id]),
+    agendamentosFiltrados(where, params, ordem, POR_PAGINA + 1, pagina * POR_PAGINA),
+    totaisFiltrados(where, params),
+    servicosOpcoes(u.empresa_id),
+    profissionaisOpcoes(u.empresa_id),
   ]);
   const temMais = linhas.length > POR_PAGINA;
   const qs = filtrosParaQuery(f);

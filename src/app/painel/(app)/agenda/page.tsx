@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
@@ -9,8 +8,8 @@ import { estornarPagamentos, mudarStatus, novoAgendamentoManual, registrarPagame
 import { Cabecalho, Campo, Form, inp } from "../../Form";
 import { Icone, StatusBadge } from "@/components/ui";
 import { linkGerenciar } from "@/lib/agendamentos";
-import { tx } from "@/lib/db";
-import { avaliarCobertura, type Cobertura } from "@/lib/planos";
+import { agendaDoPeriodo, bloqueiosDoPeriodo, coberturasPossiveis, servicosAtivosComDuracao } from "@/lib/consultas/agenda";
+import { profissionaisAtivosOpcoes } from "@/lib/consultas/cadastros";
 import { cobrarAvulsoAcao, editarAgendamentoAcao, usarPlanoAcao } from "../../acoes-planos";
 import { linkWhatsapp, textoConfirmacao } from "@/lib/mensagens";
 
@@ -18,29 +17,6 @@ export const metadata = { title: "Agenda" };
 /** horário ainda não chegou (fora do render, para manter o componente puro) */
 const aindaVai = (d: Date) => new Date(d).getTime() > Date.now();
 
-
-type Linha = {
-  id: string;
-  inicio: Date;
-  fim: Date;
-  status: string;
-  origem: string;
-  preco_centavos: number;
-  cliente: string;
-  telefone: string;
-  servico: string;
-  profissional_id: string;
-  pago: number;
-  cancelado_por: string | null;
-  token_publico: string;
-  valor_coberto_centavos: number;
-  cliente_id: string;
-  servico_id: string;
-  empresa_id: string;
-  observacao: string | null;
-  tem_plano: boolean;
-  plano: string | null;
-};
 
 export default async function Agenda({ searchParams }: PageProps<"/painel/agenda">) {
   const u = await usuarioOuLogin();
@@ -53,34 +29,15 @@ export default async function Agenda({ searchParams }: PageProps<"/painel/agenda
   const ate = instanteLocal(somarDias(dia, 1), 0, cfg.fuso_horario);
 
   const [profs, servicos, ags, bloqueios] = await Promise.all([
-    q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 and ativo order by nome`, [u.empresa_id]),
-    q<{ id: string; nome: string; duracao_min: number }>(
-      `select id, nome, duracao_min from servico where empresa_id = $1 and ativo order by ordem, nome`,
-      [u.empresa_id],
-    ),
-    q<Linha>(
-      `select a.id, a.inicio, a.fim, a.status, a.origem, a.preco_centavos, a.profissional_id, a.cancelado_por, a.token_publico, a.valor_coberto_centavos, a.cliente_id, a.servico_id, a.empresa_id, a.observacao,
-              exists (select 1 from assinatura s where s.cliente_id = a.cliente_id and s.status <> 'cancelada') as tem_plano,
-              (select p.nome from assinatura_uso us join assinatura s on s.id = us.assinatura_id join plano p on p.id = s.plano_id where us.agendamento_id = a.id) as plano,
-              c.nome as cliente, c.telefone, s.nome as servico,
-              coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
-       from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
-       where a.empresa_id = $1 and a.inicio >= $2 and a.inicio < $3 order by a.inicio`,
-      [u.empresa_id, de, ate],
-    ),
-    q<{ profissional_id: string | null; inicio: Date; fim: Date; motivo: string | null }>(
-      `select profissional_id, inicio, fim, motivo from bloqueio where empresa_id = $1 and inicio < $3 and fim > $2`,
-      [u.empresa_id, de, ate],
-    ),
+    profissionaisAtivosOpcoes(u.empresa_id),
+    servicosAtivosComDuracao(u.empresa_id),
+    agendaDoPeriodo(u.empresa_id, de, ate),
+    bloqueiosDoPeriodo(u.empresa_id, de, ate),
   ]);
 
   // planos (módulo opcional): só consulta para clientes que têm assinatura
-  const elegiveis = new Map<string, Cobertura>();
   const candidatos = ags.filter((a) => a.tem_plano && a.valor_coberto_centavos === 0 && a.pago === 0 && ["confirmado", "concluido"].includes(a.status));
-  if (candidatos.length)
-    await tx(async (t) => {
-      for (const a of candidatos) elegiveis.set(a.id, await avaliarCobertura(t, a));
-    });
+  const elegiveis = await coberturasPossiveis(candidatos);
 
   const ativos = ags.filter((a) => a.status !== "cancelado");
   const previsto = ativos.filter((a) => a.status !== "faltou").reduce((s, a) => s + a.preco_centavos - a.valor_coberto_centavos, 0); // sem a parte coberta por plano

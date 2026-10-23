@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { q, tx } from "@/lib/db";
-import { hojeDaEmpresa, METODOS, PERIODOS, sincronizarAssinaturas, STATUS_ASSINATURA } from "@/lib/planos";
+import { assinaturasDoCliente, mensalidadesRecentes, planosAtivos, sincronizarDoCliente, usosNoCiclo } from "@/lib/consultas/planos";
+import { hojeDaEmpresa, METODOS, PERIODOS, STATUS_ASSINATURA } from "@/lib/planos";
 import { reais } from "@/lib/tempo";
 import { Campo, Form } from "../../../Form";
 import { assinarPlanoAcao, cancelarAssinaturaAcao, desfazerMensalidadeAcao, registrarMensalidadeAcao } from "../../../acoes-planos";
@@ -9,49 +9,17 @@ const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
 
 /** Bloco "Plano mensal" da ficha do cliente. Não aparece para barbearias que não têm planos. */
 export default async function PlanoDoCliente({ clienteId, empresaId, gestor }: { clienteId: string; empresaId: string; gestor: boolean }) {
-  await tx((t) => sincronizarAssinaturas(t, empresaId, { clienteId }));
+  await sincronizarDoCliente(empresaId, clienteId);
   const [assinaturas, planos, { hoje }] = await Promise.all([
-    q<{
-      id: string;
-      status: string;
-      plano: string;
-      preco_centavos: number;
-      periodo_meses: number;
-      inicio: string;
-      ciclo_inicio: string;
-      ciclo_fim: string;
-      cancelada_em: Date | null;
-      plano_id: string;
-    }>(
-      `select a.id, a.status, p.nome as plano, a.preco_centavos, a.periodo_meses, a.inicio::text as inicio, a.ciclo_inicio::text as ciclo_inicio,
-              a.ciclo_fim::text as ciclo_fim, a.cancelada_em, a.plano_id
-       from assinatura a join plano p on p.id = a.plano_id where a.cliente_id = $1 and a.empresa_id = $2
-       order by (a.status = 'cancelada'), a.criado_em desc limit 5`,
-      [clienteId, empresaId],
-    ),
-    q<{ id: string; nome: string; preco_centavos: number; periodo_meses: number }>(
-      `select id, nome, preco_centavos, periodo_meses from plano where empresa_id = $1 and ativo order by nome`,
-      [empresaId],
-    ),
+    assinaturasDoCliente(clienteId, empresaId),
+    planosAtivos(empresaId),
     hojeDaEmpresa(empresaId),
   ]);
   const aberta = assinaturas.find((a) => a.status !== "cancelada");
   if (!aberta && planos.length === 0 && assinaturas.length === 0) return null; // barbearia sem planos: nada aparece
 
   const [usos, cobrancas] = aberta
-    ? await Promise.all([
-        q<{ servico: string; limite_por_ciclo: number | null; usados: number }>(
-          `select s.nome as servico, ps.limite_por_ciclo,
-                  (select count(*) from assinatura_uso u where u.assinatura_id = $1 and u.servico_id = ps.servico_id and u.ciclo_inicio = $3::date)::int as usados
-           from plano_servico ps join servico s on s.id = ps.servico_id where ps.plano_id = $2 order by s.nome`,
-          [aberta.id, aberta.plano_id, aberta.ciclo_inicio],
-        ),
-        q<{ id: string; ciclo_inicio: string; vencimento: string; valor_centavos: number; status: string; metodo: string | null }>(
-          `select id, ciclo_inicio::text as ciclo_inicio, vencimento::text as vencimento, valor_centavos, status, metodo
-           from assinatura_cobranca where assinatura_id = $1 order by ciclo_inicio desc limit 6`,
-          [aberta.id],
-        ),
-      ])
+    ? await Promise.all([usosNoCiclo(aberta.id, aberta.plano_id, aberta.ciclo_inicio), mensalidadesRecentes(aberta.id)])
     : [[], []];
   const st = aberta ? STATUS_ASSINATURA[aberta.status] : null;
 

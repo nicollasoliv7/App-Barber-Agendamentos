@@ -1,6 +1,6 @@
 import Link from "next/link";
 import QRCode from "qrcode";
-import { q } from "@/lib/db";
+import { profissionaisOpcoes, servicosOpcoes, totalClientes } from "@/lib/consultas/cadastros";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento } from "@/lib/empresa";
 import { expirarPendentes } from "@/lib/disponibilidade";
@@ -25,12 +25,12 @@ export default async function VisaoGeral({ searchParams }: PageProps<"/painel">)
   await expirarPendentes();
   const cfg = await configAgendamento(u.empresa_id);
   const f = lerFiltros(await searchParams, cfg.fuso_horario);
-  const [d, servicos, profissionais, origem, [{ total_clientes }]] = await Promise.all([
+  const [d, servicos, profissionais, origem, total_clientes] = await Promise.all([
     dashboard(u.empresa_id, f),
-    q<{ id: string; nome: string }>(`select id, nome from servico where empresa_id = $1 order by ordem, nome`, [u.empresa_id]),
-    q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 order by nome`, [u.empresa_id]),
+    servicosOpcoes(u.empresa_id),
+    profissionaisOpcoes(u.empresa_id),
     origemApp(),
-    q<{ total_clientes: number }>(`select count(*)::int as total_clientes from cliente where empresa_id = $1`, [u.empresa_id]),
+    totalClientes(u.empresa_id),
   ]);
   // planos: só para quem usa o módulo (nada aparece para barbearias sem planos)
   const planos = (await usaPlanos(u.empresa_id))

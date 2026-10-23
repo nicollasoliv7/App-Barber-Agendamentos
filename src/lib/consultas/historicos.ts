@@ -30,3 +30,14 @@ export const importacoesRecentes = (empresaId: string) =>
      where i.empresa_id = $1 and i.status <> 'rascunho' order by i.criado_em desc limit 10`,
     [empresaId],
   );
+
+/** Resultado dos envios de WhatsApp nos últimos 30 dias (status reais). */
+export const estatisticasDeEnvio = (empresaId: string) =>
+  q<{ aceitas: number; entregues: number; falhas: number; nao_enviadas: number }>(
+    `select count(*) filter (where status in ('aceito','enviado','entregue','lido'))::int as aceitas,
+              count(*) filter (where status in ('entregue','lido'))::int as entregues,
+              count(*) filter (where status = 'falhou')::int as falhas,
+              count(*) filter (where status = 'nao_enviado')::int as nao_enviadas
+       from notificacao where empresa_id = $1 and criado_em > now() - interval '30 days'`,
+    [empresaId],
+  );
