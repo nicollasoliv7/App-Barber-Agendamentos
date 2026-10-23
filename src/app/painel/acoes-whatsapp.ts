@@ -11,6 +11,7 @@ import { normalizarTelefone } from "@/lib/validacao";
 import { ErroNegocio } from "@/lib/tipos";
 import { cifrar, criptografiaPronta, decifrar, ErroMeta, verificarCredenciais, verificarModelo } from "@/lib/whatsapp";
 import type { Estado } from "./acoes";
+import { log } from "@/lib/log";
 
 /** Só dono/admin mexem na integração. Tudo sempre restrito à empresa do usuário logado. */
 async function gestor() {
@@ -27,7 +28,7 @@ async function executar(fn: () => Promise<string>): Promise<Estado> {
     return { ok };
   } catch (e) {
     if (e instanceof ErroNegocio || e instanceof ErroMeta) return { erro: e.message };
-    console.error("[whatsapp]", e);
+    log.erro("[whatsapp]", e);
     return { erro: "Não foi possível concluir. Tente novamente." };
   }
 }

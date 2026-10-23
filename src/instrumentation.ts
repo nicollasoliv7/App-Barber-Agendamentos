@@ -1,3 +1,5 @@
+import { log } from "./lib/log";
+
 /**
  * Rotinas em segundo plano quando o app roda como servidor único (local ou VPS):
  * a cada minuto expira Pix vencidos (R18) e envia lembretes (R14b).
@@ -16,7 +18,7 @@ export async function register() {
       await expirarPendentes();
       await enviarLembretes();
     } catch (e) {
-      console.error("[agendou] rotina falhou:", e);
+      log.erro("[agendou] rotina falhou:", e);
     }
   };
   g.__agendouRotinas = setInterval(rodar, 60_000);

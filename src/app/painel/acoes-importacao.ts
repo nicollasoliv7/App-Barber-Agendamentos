@@ -5,6 +5,7 @@ import { usuarioPainel } from "@/lib/sessao";
 import * as imp from "@/lib/importacao";
 import { ErroNegocio } from "@/lib/tipos";
 import { isUuid } from "@/lib/validacao";
+import { log } from "@/lib/log";
 
 type Resp<T> = { ok: true; dados: T } | { ok: false; erro: string };
 
@@ -20,7 +21,7 @@ async function rodar<T>(fn: () => Promise<T>): Promise<Resp<T>> {
     return { ok: true, dados: await fn() };
   } catch (e) {
     if (e instanceof ErroNegocio) return { ok: false, erro: e.message };
-    console.error(e);
+    log.erro(e);
     return { ok: false, erro: "Não foi possível processar. Tente novamente." };
   }
 }

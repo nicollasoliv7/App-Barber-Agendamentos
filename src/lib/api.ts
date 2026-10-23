@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { ErroNegocio } from "./tipos";
+import { log } from "./log";
 
 export function ok(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
@@ -12,7 +13,7 @@ export async function rota(fn: () => Promise<Response>): Promise<Response> {
     return await fn();
   } catch (e) {
     if (e instanceof ErroNegocio) return NextResponse.json({ erro: e.message }, { status: e.status });
-    console.error(e);
+    log.erro(e);
     return NextResponse.json({ erro: "Erro inesperado. Tente novamente." }, { status: 500 });
   }
 }

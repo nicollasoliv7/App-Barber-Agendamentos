@@ -1,6 +1,7 @@
 import "server-only";
 import fs from "node:fs";
 import path from "node:path";
+import { log } from "./log";
 
 /**
  * Camada mínima de acesso ao Postgres.
@@ -90,7 +91,7 @@ async function iniciar(): Promise<Driver> {
   if (n === 0 && process.env.SEED !== "0") {
     const { semear } = await import("./seed");
     await d.transaction((tx) => semear(tx));
-    console.log("[agendou] banco criado com dados fictícios de exemplo");
+    log.info("[agendou] banco criado com dados fictícios de exemplo");
   }
   return d;
 }
@@ -124,7 +125,7 @@ export async function tx<T>(fn: (t: Executor) => Promise<T>): Promise<T> {
     try {
       await f();
     } catch (e) {
-      console.error("[agendou] tarefa pós-commit falhou:", e);
+      log.erro("[agendou] tarefa pós-commit falhou:", e);
     }
   }
   return out;

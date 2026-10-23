@@ -29,10 +29,8 @@ const eslintConfig = defineConfig([
       //
       // Baseline: 7 arquivos acima de 350 linhas.
       "quality/max-lines": ["warn", { max: 350 }],
-      // Baseline: 9 chamadas de console (o projeto ainda não tem um módulo de log;
-      // quando existir, aponte `logger` para ele e crie um bloco "off" só para ele,
-      // DEPOIS deste bloco).
-      "quality/no-direct-console": ["warn", { logger: "um módulo de log do projeto (ainda não existe)" }],
+      // Baseline: 9 chamadas de console → 0 (todas passam por src/lib/log.ts).
+      "quality/no-direct-console": ["warn", { logger: "log.info() / log.erro() de @/lib/log" }],
       // Baseline: 33 imports do cliente do banco (@/lib/db: db, q, q1, tx) em 32 arquivos
       // de src/app (páginas, rotas e ações consultam o banco direto). Alvo: passar por
       // funções de src/lib (repositórios/serviços).
@@ -45,6 +43,14 @@ const eslintConfig = defineConfig([
           extensions: [".tsx"],
         },
       ],
+    },
+  },
+  {
+    // O adaptador de log É o wrapper do console. Este bloco fica DEPOIS do que liga a
+    // regra: no flat config o último bloco que casa com o arquivo vence.
+    files: ["src/lib/log.ts"],
+    rules: {
+      "quality/no-direct-console": "off",
     },
   },
   {

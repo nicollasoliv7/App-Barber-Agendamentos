@@ -1,6 +1,7 @@
 import "server-only";
 import { q, q1, type Executor } from "./db";
 import { decifrar, enviarModelo, ErroMeta, type ConexaoWhatsapp } from "./whatsapp";
+import { log } from "./log";
 
 /**
  * Notificações por WhatsApp.
@@ -107,7 +108,7 @@ export async function despachar(id: string): Promise<string> {
     return "aceito";
   } catch (e) {
     const msg = e instanceof ErroMeta ? e.message : "Falha inesperada ao enviar";
-    if (!(e instanceof ErroMeta)) console.error("[whatsapp] envio falhou:", e);
+    if (!(e instanceof ErroMeta)) log.erro("[whatsapp] envio falhou:", e);
     await marcar(id, "falhou", msg, { limparParametros: ehCodigo });
     if (e instanceof ErroMeta && e.credencialInvalida) {
       await q(`update whatsapp_conexao set status = 'erro', ultimo_erro = $2 where empresa_id = $1`, [n.empresa_id, msg]);

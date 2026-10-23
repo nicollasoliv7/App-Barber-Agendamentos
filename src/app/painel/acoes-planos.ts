@@ -17,6 +17,7 @@ import {
 import { ErroNegocio, type Agendamento } from "@/lib/tipos";
 import { isUuid, normalizarTelefone } from "@/lib/validacao";
 import type { Estado } from "./acoes";
+import { log } from "@/lib/log";
 
 async function usuario() {
   const u = await usuarioPainel();
@@ -37,7 +38,7 @@ async function executar(fn: () => Promise<string>): Promise<Estado> {
     if (e instanceof ErroNegocio) return { erro: e.message };
     const m = e instanceof Error ? e.message : String(e);
     if (m.includes("assinatura_cliente_aberta")) return { erro: "Este cliente já tem um plano em andamento." };
-    console.error("[planos]", e);
+    log.erro("[planos]", e);
     return { erro: "Não foi possível salvar. Tente novamente." };
   }
 }

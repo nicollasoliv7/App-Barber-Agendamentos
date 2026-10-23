@@ -9,6 +9,7 @@ import { instanteLocal, paraMinutos } from "@/lib/tempo";
 import { ErroNegocio } from "@/lib/tipos";
 import { configAgendamento } from "@/lib/empresa";
 import { isUuid, normalizarTelefone } from "@/lib/validacao";
+import { log } from "@/lib/log";
 
 export type Estado = { erro?: string; ok?: string } | undefined;
 
@@ -32,7 +33,7 @@ async function executar(fn: () => Promise<string | void>, caminho = "/painel"): 
     const m = e instanceof Error ? e.message : String(e);
     if (m.includes("duplicate key") || m.includes("unique")) return { erro: "Já existe um registro com esse valor" };
     if (m.includes("check constraint")) return { erro: "Valor fora do permitido" };
-    console.error(e);
+    log.erro(e);
     return { erro: "Não foi possível salvar" };
   }
 }
