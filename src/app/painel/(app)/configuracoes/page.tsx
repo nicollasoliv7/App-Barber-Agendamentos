@@ -1,7 +1,6 @@
-import { q, q1 } from "@/lib/db";
+import { camposPersonalizados, empresaPorId, unidadesDaEmpresa } from "@/lib/consultas/cadastros";
 import { usuarioOuLogin } from "@/lib/painel";
 import { configAgendamento, configTema } from "@/lib/empresa";
-import type { CampoPersonalizado, Empresa } from "@/lib/tipos";
 import { conexaoPublica } from "@/lib/whatsapp";
 import Link from "next/link";
 import { salvarCampo, salvarEmpresa, salvarRegras, salvarTema, salvarUnidade } from "../../acoes";
@@ -12,14 +11,11 @@ export const metadata = { title: "Configurações" };
 export default async function Page() {
   const u = await usuarioOuLogin();
   const [e, tema, cfg, campos, unidades, wa] = await Promise.all([
-    q1<Empresa>(`select * from empresa where id = $1`, [u.empresa_id]),
+    empresaPorId(u.empresa_id),
     configTema(u.empresa_id),
     configAgendamento(u.empresa_id),
-    q<CampoPersonalizado>(`select * from campo_personalizado where empresa_id = $1 order by ordem`, [u.empresa_id]),
-    q<{ id: string; nome: string; endereco: string | null; maps_url: string | null; ativo: boolean }>(
-      `select id, nome, endereco, maps_url, ativo from unidade where empresa_id = $1 order by nome`,
-      [u.empresa_id],
-    ),
+    camposPersonalizados(u.empresa_id),
+    unidadesDaEmpresa(u.empresa_id),
     conexaoPublica(u.empresa_id),
   ]);
   const card = "card p-4 md:p-5";

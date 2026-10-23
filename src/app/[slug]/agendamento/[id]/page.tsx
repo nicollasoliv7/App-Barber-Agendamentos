@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { q1 } from "@/lib/db";
+import { idEmpresaPorSlug } from "@/lib/consultas/publico";
 import { configTema } from "@/lib/empresa";
 import { buscarPorToken } from "@/lib/gerenciar";
 import { ErroNegocio } from "@/lib/tipos";
@@ -13,7 +13,7 @@ export default async function Page({ params, searchParams }: PageProps<"/[slug]/
   const { slug, id } = await params;
   const t = (await searchParams).t;
   const token = typeof t === "string" ? t : "";
-  const emp = await q1<{ id: string }>(`select id from empresa where slug = $1`, [slug]);
+  const emp = await idEmpresaPorSlug(slug);
   if (!emp || !isUuid(id)) notFound();
   const tema = await configTema(emp.id);
   let ag = null;

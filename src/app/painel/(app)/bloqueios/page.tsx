@@ -1,4 +1,4 @@
-import { q } from "@/lib/db";
+import { bloqueiosFuturos, profissionaisOpcoes } from "@/lib/consultas/cadastros";
 import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora } from "@/lib/tempo";
 import { adicionarBloqueio, removerBloqueio } from "../../acoes";
@@ -8,12 +8,8 @@ export const metadata = { title: "Folgas e bloqueios" };
 
 export default async function Page() {
   const u = await usuarioOuLogin();
-  const profs = await q<{ id: string; nome: string }>(`select id, nome from profissional where empresa_id = $1 order by nome`, [u.empresa_id]);
-  const bls = await q<{ id: string; inicio: Date; fim: Date; motivo: string | null; profissional: string | null }>(
-    `select b.id, b.inicio, b.fim, b.motivo, p.nome as profissional from bloqueio b left join profissional p on p.id = b.profissional_id
-     where b.empresa_id = $1 and b.fim > now() order by b.inicio`,
-    [u.empresa_id],
-  );
+  const profs = await profissionaisOpcoes(u.empresa_id);
+  const bls = await bloqueiosFuturos(u.empresa_id);
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Folgas e bloqueios</h1>

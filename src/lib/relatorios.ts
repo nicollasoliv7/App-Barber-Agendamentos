@@ -247,3 +247,13 @@ export async function dashboard(empresaId: string, f: Filtros) {
     proximos,
   };
 }
+
+/** Linhas do CSV de agendamentos (usa o WHERE de whereAgendamentos, sempre restrito à empresa). */
+export const linhasExportacao = (where: string, params: unknown[]) =>
+  q<Record<string, unknown>>(
+    `select a.inicio, c.nome as cliente, c.telefone, s.nome as servico, pr.nome as profissional, a.preco_centavos, a.valor_coberto_centavos, a.status, a.origem,
+            coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
+     from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id join profissional pr on pr.id = a.profissional_id
+     where ${where} order by a.inicio limit 20000`,
+    params,
+  );

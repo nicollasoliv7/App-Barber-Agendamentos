@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { importacoesRecentes } from "@/lib/consultas/historicos";
 import { usuarioOuLogin } from "@/lib/painel";
 import { FONTES_API, FONTES_ARQUIVO } from "@/lib/importacao/fontes";
 import { NAO_IMPORTAVEL, CAMPOS } from "@/lib/importacao/campos";
@@ -9,26 +9,10 @@ import Importador from "./Importador";
 
 export const metadata = { title: "Importar clientes" };
 
-type Hist = {
-  id: string;
-  arquivo_nome: string | null;
-  formato: string;
-  status: string;
-  total_linhas: number;
-  resultado: { inseridos?: number; completados?: number; mantidos?: number; erros?: number } | null;
-  criado_em: Date;
-  autor: string | null;
-};
-
 export default async function Page() {
   const u = await usuarioOuLogin();
   const podeImportar = u.papel === "dono" || u.papel === "admin";
-  const hist = await q<Hist>(
-    `select i.id, i.arquivo_nome, i.formato, i.status, i.total_linhas, i.resultado, i.criado_em, up.nome as autor
-     from importacao i left join usuario_painel up on up.id = i.usuario_id
-     where i.empresa_id = $1 and i.status <> 'rascunho' order by i.criado_em desc limit 10`,
-    [u.empresa_id],
-  );
+  const hist = await importacoesRecentes(u.empresa_id);
 
   return (
     <>

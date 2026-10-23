@@ -1,5 +1,5 @@
 import { ok, rota } from "@/lib/api";
-import { q } from "@/lib/db";
+import { historicoDoCliente } from "@/lib/consultas/cliente";
 import { clienteLogado } from "@/lib/sessao";
 import { expirarPendentes } from "@/lib/disponibilidade";
 import { configAgendamento } from "@/lib/empresa";
@@ -15,20 +15,7 @@ export async function GET(req: Request) {
     const limite = Math.min(50, Math.max(1, Number(sp.get("limite") ?? 10)));
     const pagina = Math.max(0, Number(sp.get("pagina") ?? 0));
     const cfg = await configAgendamento(c.empresa_id);
-    const itens = await q(
-      `select a.id, a.inicio, a.fim, a.status, a.preco_centavos, a.cancelado_por, a.expira_em, a.token_publico as token,
-              s.nome as servico, p.nome as profissional, a.servico_id, a.profissional_id,
-              coalesce((select sum(valor_centavos) from pagamento pg where pg.agendamento_id = a.id and pg.status = 'pago'), 0)::int as pago_centavos,
-              (select json_build_object('id', pg.id, 'valor_centavos', pg.valor_centavos, 'expira_em', pg.expira_em)
-                 from pagamento pg where pg.agendamento_id = a.id and pg.status = 'pendente' and pg.metodo = 'pix'
-                 order by pg.criado_em desc limit 1) as pix_pendente
-       from agendamento a join servico s on s.id = a.servico_id join profissional p on p.id = a.profissional_id
-       where a.cliente_id = $1
-       order by (a.inicio >= now() and a.status in ('confirmado','pendente_pagamento')) desc,
-                case when a.inicio >= now() then a.inicio end asc, a.inicio desc
-       limit $2 offset $3`,
-      [c.id, limite + 1, pagina * limite],
-    );
+    const itens = await historicoDoCliente(c.id, limite + 1, pagina * limite);
     const agora = Date.now();
     return ok({
       cliente: { nome: c.nome, telefone: c.telefone },

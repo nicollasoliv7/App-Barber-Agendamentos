@@ -295,3 +295,8 @@ export async function aplicarStatus(phoneNumberId: string, wamid: string, status
   );
   return true;
 }
+
+/** Marca que chegou um evento da Meta para este número (mostrado no painel como "último status recebido"). */
+export async function registrarWebhookRecebido(phoneNumberId: string) {
+  await q(`update whatsapp_conexao set ultimo_webhook_em = now() where phone_number_id = $1`, [phoneNumberId]);
+}

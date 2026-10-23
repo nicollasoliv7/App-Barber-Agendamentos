@@ -1,5 +1,5 @@
 import { ok, rota } from "@/lib/api";
-import { q1 } from "@/lib/db";
+import { agendamentoDoClienteParaRemarcar } from "@/lib/consultas/cliente";
 import { clienteLogado } from "@/lib/sessao";
 import { diasDisponiveis, horariosLivres } from "@/lib/disponibilidade";
 import { hhmm } from "@/lib/tempo";
@@ -13,10 +13,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/cliente/agendame
     const c = await clienteLogado();
     if (!c) throw new ErroNegocio("Faça login", 401);
     if (!isUuid(id)) throw new ErroNegocio("Agendamento inválido");
-    const ag = await q1<{ empresa_id: string; servico_id: string; profissional_id: string }>(
-      `select empresa_id, servico_id, profissional_id from agendamento where id = $1 and cliente_id = $2`,
-      [id, c.id],
-    );
+    const ag = await agendamentoDoClienteParaRemarcar(id, c.id);
     if (!ag) throw new ErroNegocio("Agendamento não encontrado", 404);
     const dia = new URL(req.url).searchParams.get("dia");
     if (dia) {

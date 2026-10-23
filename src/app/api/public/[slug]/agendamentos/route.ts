@@ -1,7 +1,7 @@
 import { corpo, ok, rota } from "@/lib/api";
 import { empresaPorSlug } from "@/lib/empresa";
 import { criarAgendamento } from "@/lib/agendamentos";
-import { q1 } from "@/lib/db";
+import { nomeProfissional } from "@/lib/consultas/publico";
 import { isUuid } from "@/lib/validacao";
 import { ErroNegocio } from "@/lib/tipos";
 import { statusConfirmacao } from "@/lib/notificacoes";
@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/public/[slug]/a
       extras: typeof b.extras === "object" && b.extras ? b.extras : {},
     });
     const [prof, whatsapp] = await Promise.all([
-      q1<{ nome: string }>(`select nome from profissional where id = $1`, [ag.profissional_id]),
+      nomeProfissional(ag.profissional_id),
       statusConfirmacao(ag.id), // status real: "aceito" só se a Meta aceitou o envio
     ]);
     return ok(

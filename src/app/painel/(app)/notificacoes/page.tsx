@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { notificacoesRecentes } from "@/lib/consultas/historicos";
 import { usuarioOuLogin } from "@/lib/painel";
 import { formatarDataHora } from "@/lib/tempo";
 import { formatarTelefone } from "@/lib/validacao";
@@ -31,10 +31,7 @@ const TIPOS: Record<string, string> = {
 
 export default async function Page() {
   const u = await usuarioOuLogin();
-  const ns = await q<{ id: string; canal: string; tipo: string | null; destino: string; mensagem: string; status: string; erro: string | null; criado_em: Date }>(
-    `select id, canal, tipo, destino, mensagem, status, erro, criado_em from notificacao where empresa_id = $1 order by criado_em desc limit 100`,
-    [u.empresa_id],
-  );
+  const ns = await notificacoesRecentes(u.empresa_id);
   return (
     <>
       <Cabecalho

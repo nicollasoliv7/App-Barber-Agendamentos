@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { q } from "@/lib/db";
+import { empresaDemonstracao } from "@/lib/consultas/publico";
 import { Aurora, Icone, Logo } from "@/components/ui";
 
 export default async function Home() {
-  const empresas = await q<{ nome: string; slug: string }>(`select nome, slug from empresa order by criado_em limit 1`);
+  const empresas = await empresaDemonstracao();
   const demo = empresas[0]?.slug ? `/${empresas[0].slug}` : "/painel";
 
   return (

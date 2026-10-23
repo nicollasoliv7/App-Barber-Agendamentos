@@ -1,6 +1,6 @@
 import { ok, rota } from "@/lib/api";
 import { camposAtivos, configAgendamento, configTema, empresaPorSlug, servicosAtivos } from "@/lib/empresa";
-import { q } from "@/lib/db";
+import { unidadesAtivas } from "@/lib/consultas/publico";
 
 /** Dados da página pública: empresa, tema, serviços, campos e regras de pagamento. */
 export async function GET(_req: Request, ctx: RouteContext<"/api/public/[slug]">) {
@@ -12,7 +12,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/public/[slug]">
       configAgendamento(e.id),
       servicosAtivos(e.id),
       camposAtivos(e.id),
-      q(`select id, nome, endereco, maps_url from unidade where empresa_id = $1 and ativo order by nome`, [e.id]),
+      unidadesAtivas(e.id),
     ]);
     return ok({
       empresa: { nome: e.nome, slug: e.slug, endereco: e.endereco, maps_url: e.maps_url, logo_url: e.logo_url, multiunidade: e.multiunidade, unidades },

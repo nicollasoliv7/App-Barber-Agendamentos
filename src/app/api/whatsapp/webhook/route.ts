@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
-import { q } from "@/lib/db";
-import { aplicarStatus, conferirAssinatura, segredosDoWebhook } from "@/lib/whatsapp";
+import { aplicarStatus, conferirAssinatura, registrarWebhookRecebido, segredosDoWebhook } from "@/lib/whatsapp";
 
 /**
  * Webhook da WhatsApp Cloud API (Meta).
@@ -57,7 +56,7 @@ export async function POST(req: Request) {
     const numero = v.metadata?.phone_number_id;
     if (!numero) continue;
     if (quem.numero && quem.numero !== numero) continue; // app próprio de uma barbearia só fala pelo próprio número
-    await q(`update whatsapp_conexao set ultimo_webhook_em = now() where phone_number_id = $1`, [numero]);
+    await registrarWebhookRecebido(numero);
     for (const s of v.statuses ?? []) {
       if (!s.id || !s.status) continue;
       const err = s.errors?.[0];

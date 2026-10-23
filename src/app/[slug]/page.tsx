@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import { confirmacaoAutomaticaAtiva } from "@/lib/whatsapp";
 import { notFound } from "next/navigation";
-import { q, q1 } from "@/lib/db";
+import { empresaCompletaPorSlug, resumoEmpresaPorSlug, totalProfissionaisAtivos, unidadesAtivas } from "@/lib/consultas/publico";
 import { camposAtivos, configAgendamento, configTema, servicosAtivos } from "@/lib/empresa";
-import type { Empresa } from "@/lib/tipos";
 import PaginaPublica from "./PaginaPublica";
 
 export async function generateMetadata({ params }: PageProps<"/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const e = await q1<{ nome: string; endereco: string | null }>(`select nome, endereco from empresa where slug = $1`, [slug]);
+  const e = await resumoEmpresaPorSlug(slug);
   if (!e) return { title: "Não encontrado" };
   const titulo = `Agende na ${e.nome}`;
   const desc = `Escolha o serviço, o profissional e o horário em poucos toques, sem cadastro.${e.endereco ? ` ${e.endereco}.` : ""}`;
@@ -17,18 +16,15 @@ export async function generateMetadata({ params }: PageProps<"/[slug]">): Promis
 
 export default async function Page({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
-  const e = await q1<Empresa>(`select * from empresa where slug = $1`, [slug]);
+  const e = await empresaCompletaPorSlug(slug);
   if (!e) notFound();
   const [tema, cfg, servicos, campos, unidades, [{ profs }]] = await Promise.all([
     configTema(e.id),
     configAgendamento(e.id),
     servicosAtivos(e.id),
     camposAtivos(e.id),
-    q<{ id: string; nome: string; endereco: string | null; maps_url: string | null }>(
-      `select id, nome, endereco, maps_url from unidade where empresa_id = $1 and ativo order by nome`,
-      [e.id],
-    ),
-    q<{ profs: number }>(`select count(*)::int as profs from profissional where empresa_id = $1 and ativo`, [e.id]),
+    unidadesAtivas(e.id),
+    totalProfissionaisAtivos(e.id),
   ]);
   const estilo = {
     "--t-primaria": tema.cor_primaria,

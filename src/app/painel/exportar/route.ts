@@ -1,7 +1,6 @@
-import { q } from "@/lib/db";
 import { usuarioPainel } from "@/lib/sessao";
 import { configAgendamento } from "@/lib/empresa";
-import { lerFiltros, whereAgendamentos } from "@/lib/relatorios";
+import { lerFiltros, linhasExportacao, whereAgendamentos } from "@/lib/relatorios";
 import { formatarDataHora, instanteLocal, somarDias } from "@/lib/tempo";
 import { ROTULO_STATUS } from "@/components/ui";
 
@@ -20,13 +19,7 @@ export async function GET(req: Request) {
   const sp = Object.fromEntries(new URL(req.url).searchParams);
   const f = lerFiltros(sp, cfg.fuso_horario, "30d");
   const { where, params } = whereAgendamentos(u.empresa_id, f, instanteLocal(f.de, 0, cfg.fuso_horario), instanteLocal(somarDias(f.ate, 1), 0, cfg.fuso_horario));
-  const rows = await q<Record<string, unknown>>(
-    `select a.inicio, c.nome as cliente, c.telefone, s.nome as servico, pr.nome as profissional, a.preco_centavos, a.valor_coberto_centavos, a.status, a.origem,
-            coalesce((select sum(valor_centavos) from pagamento p where p.agendamento_id = a.id and p.status='pago'),0)::int as pago
-     from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id join profissional pr on pr.id = a.profissional_id
-     where ${where} order by a.inicio limit 20000`,
-    params,
-  );
+  const rows = await linhasExportacao(where, params);
   const cab = ["Data e hora", "Cliente", "Telefone", "Serviço", "Profissional", "Valor (R$)", "Coberto por plano (R$)", "Pago (R$)", "Status", "Origem"];
   const linhas = rows.map((r) =>
     [

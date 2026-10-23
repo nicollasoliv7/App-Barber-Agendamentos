@@ -1,5 +1,5 @@
 import { corpo, ok, rota } from "@/lib/api";
-import { q } from "@/lib/db";
+import { cartoesDoCliente } from "@/lib/consultas/cliente";
 import { clienteLogado } from "@/lib/sessao";
 import { salvarCartao } from "@/lib/pagamentos";
 import { ErroNegocio } from "@/lib/tipos";
@@ -8,10 +8,7 @@ export async function GET() {
   return rota(async () => {
     const c = await clienteLogado();
     if (!c) throw new ErroNegocio("Faça login", 401);
-    const cartoes = await q(
-      `select id, bandeira, ultimos4, validade_mes, validade_ano, favorito from cartao where cliente_id = $1 order by favorito desc, criado_em desc`,
-      [c.id],
-    );
+    const cartoes = await cartoesDoCliente(c.id);
     return ok({ cartoes });
   });
 }
