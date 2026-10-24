@@ -4,10 +4,21 @@ import { usuarioPainel } from "@/lib/sessao";
 import { Aurora, Icone, Logo } from "@/components/ui";
 import { sair } from "../acoes";
 import Menu from "./Menu";
+import { situacaoAssinatura } from "@/lib/planos-sistema";
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const u = await usuarioPainel();
   if (!u) redirect("/painel/login");
+  const s = await situacaoAssinatura(u.empresa_id);
+  const diasRestantes = s.diasRestantes;
+  const aviso =
+    s.limite !== null && s.clientes >= s.limite
+      ? `Plano Gratuito: limite de ${s.limite} clientes atingido. Novos clientes ficam bloqueados até você assinar.`
+      : s.limite !== null && s.clientes >= s.limite - 3
+        ? `Plano Gratuito: ${s.clientes} de ${s.limite} clientes cadastrados.`
+        : diasRestantes !== null && diasRestantes <= 7 && s.origem === "pagamento"
+          ? `Seu plano vence em ${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}. Não há renovação automática.`
+          : null;
   return (
     <div className="ui relative min-h-screen md:flex">
       <div className="fixed inset-0 -z-10">
@@ -52,7 +63,17 @@ export default async function PainelLayout({ children }: { children: React.React
         </div>
       </aside>
       <main id="conteudo" className="relative flex-1 min-w-0 px-4 py-6 md:px-8 md:py-8">
-        <div className="mx-auto max-w-[1240px]">{children}</div>
+        <div className="mx-auto max-w-[1240px]">
+          {aviso && (
+            <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#ffb347]/30 bg-[#ffb347]/[0.07] px-4 py-3 text-sm text-[#ffcf8a]">
+              <span>{aviso}</span>
+              <Link href="/painel/assinatura" className="btn btn-sutil btn-sm">
+                Ver planos
+              </Link>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

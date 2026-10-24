@@ -5,6 +5,7 @@ import { conferirSenha, hashSenha, sha256, tokenAleatorio } from "./senha";
 import { notificar } from "./notificacoes";
 import { ErroNegocio } from "./tipos";
 import { normalizarTelefone } from "./validacao";
+import { conferirVagaSeNovo } from "./planos-sistema";
 
 const DIAS = 30;
 const COOKIE = { painel: "agendou_painel", cliente: "agendou_cliente" } as const;
@@ -64,6 +65,11 @@ export async function usuarioPainel(): Promise<UsuarioPainel | null> {
       [s.usuario_id],
     )) ?? null
   );
+}
+
+/** Abre a sessão do painel para um usuário recém-criado (cadastro self-service). */
+export async function abrirSessaoPainel(usuarioId: string) {
+  await criarSessao("painel", usuarioId);
 }
 
 export async function loginPainel(telefoneDigitado: string, senha: string) {
@@ -168,6 +174,7 @@ export async function cadastrarSenha(empresaId: string, telefoneBruto: string, c
       throw new ErroNegocio("Código incorreto");
     }
     await t.query(`update codigo_verificacao set usado = true where id = $1`, [cod.id]);
+    await conferirVagaSeNovo(t, empresaId, telefone, "publico"); // limite do plano Gratuito
     const [c] = await t.query<{ id: string }>(
       `insert into cliente (empresa_id, nome, telefone, senha_hash, telefone_verificado) values ($1,$2,$3,$4,true)
        on conflict (empresa_id, telefone) do update set senha_hash = excluded.senha_hash, telefone_verificado = true

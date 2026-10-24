@@ -311,3 +311,21 @@ Arquivos acima de 350 linhas:
 **Fora do escopo**: os 61 avisos de `npm run lint:typed` (regras com tipos) continuam em "warn".
 
 **Próximo passo**: zerar o `lint:typed`, se quiser. O deploy na Vercel ainda depende da sua aprovação do acesso ao time.
+
+## Assinatura da plataforma pela AbacatePay (v6) · 24/10/2026
+
+**O que foi feito**
+- **Planos:** Gratuito (até 15 clientes cadastrados), Mensal R$ 59,90, Trimestral R$ 159,90 e Anual R$ 599,90, todos **pré-pagos** por checkout avulso da AbacatePay v2, sem renovação automática (decisão do dono). Regras R68–R75; passo a passo em `docs/ABACATEPAY.md`.
+- **Cadastro self-service:** `/cadastro` cria a conta no Gratuito. A tela `/painel/assinatura` mostra o plano, o uso, o pagamento e o histórico. Há um aviso no painel quando o limite está perto ou o plano vence em até 7 dias.
+- **Limite de 15 no backend:** cadastro manual, agendamento, cadastro de senha do cliente e importação passam pela conferência, dentro da transação e com trava na empresa. O Supabase tem um trigger em `cliente`.
+- **Webhook `/api/abacatepay/webhook`:** valida o segredo da URL e o HMAC `X-Webhook-Signature` (obrigatório em produção). Registra o `id` de cada evento em `webhook_evento` para descartar duplicados. O plano só é liberado depois de conferir o checkout em `GET /v2/checkouts/get`, e pagamento em Dev Mode não libera plano em produção.
+- **Rede de segurança:** a tela de assinatura confere as cobranças pendentes das últimas 48 h.
+- **Migrations:** `20261024030000_assinatura_sistema.sql` e `20261024040000_webhook_evento.sql`.
+- **Landing (repo da LP):** os CTAs apontam para `https://app-barber-agendamentos.vercel.app/cadastro?plano=…` e o texto passou a usar "clientes cadastrados".
+
+**Verificação**
+- `tsc`: limpo. Lint: 0 erros. Build: ok.
+- e2e com mock: `assinatura` 26/26, `assinatura-devmode` 2/2, `fluxo-completo`, `pix-e-historico` e `planos` ok.
+- `responsivo` acusa estouro em `/painel/agendamentos` (1024 e 390 px). O mesmo ocorre na versão commitada anterior, então não foi causado por esta mudança; fica como pendência à parte.
+
+**Pendente (manual):** produtos, webhook e variáveis na AbacatePay e na Vercel; migrations no Supabase; deploy. Nada disso foi validado contra a API real (nenhuma chave foi usada).

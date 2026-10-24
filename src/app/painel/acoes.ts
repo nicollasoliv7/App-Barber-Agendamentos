@@ -202,7 +202,7 @@ export async function salvarEmpresa(_: Estado, f: FormData): Promise<Estado> {
   return executar(async () => {
     const slug = txt(f, "slug").toLowerCase();
     if (!/^[a-z0-9]([a-z0-9-]{1,48}[a-z0-9])$/.test(slug)) throw new ErroNegocio("Endereço da página: use letras minúsculas, números e hífen");
-    if (["api", "painel", "_next"].includes(slug)) throw new ErroNegocio("Esse endereço é reservado");
+    if (["api", "painel", "_next", "cadastro"].includes(slug)) throw new ErroNegocio("Esse endereço é reservado");
     await atualizarEmpresa(u.empresa_id, {
       nome: txt(f, "nome"),
       slug,

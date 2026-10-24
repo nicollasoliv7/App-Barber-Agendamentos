@@ -1,6 +1,7 @@
 import "server-only";
 import { q, q1, tx, type Executor } from "../db";
 import { ErroNegocio } from "../tipos";
+import { conferirVagaClientes } from "../planos-sistema";
 import { cpfValido, normalizarTelefone, soDigitos } from "../validacao";
 import { lerArquivo, type Planilha } from "./leitura";
 
@@ -255,6 +256,7 @@ export async function confirmar(empresaId: string, id: string, mapeamentoBruto: 
 
     let inseridos = 0;
     const novos = rel.linhas.filter((l) => l.situacao === "novo");
+    await conferirVagaClientes(t, empresaId, novos.length, "importacao"); // limite do plano Gratuito (nada é gravado se passar)
     for (let i = 0; i < novos.length; i += 200) {
       const lote = novos.slice(i, i + 200);
       const params: unknown[] = [empresaId, id];

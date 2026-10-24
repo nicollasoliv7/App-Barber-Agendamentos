@@ -75,6 +75,12 @@ export async function semear(t: Executor) {
     [e, SEED_LOGIN.telefone, SEED_LOGIN.email, hashSenha(SEED_LOGIN.senha)],
   );
 
+  // a barbearia de demonstração tem mais de 15 clientes fictícios: entra como cortesia (sem cobrança)
+  await t.query(
+    `insert into assinatura_sistema (empresa_id, plano, valido_ate, origem) values ($1, 'anual', now() + interval '10 years', 'cortesia')`,
+    [e],
+  );
+
   await historicoFicticio(t, e, ids, profIds);
 }
 

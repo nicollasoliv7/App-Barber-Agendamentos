@@ -18,6 +18,7 @@ const itens = [
   ["/painel/whatsapp", "WhatsApp", "whatsapp"],
   ["/painel/notificacoes", "Notificações", "sino"],
   ["/painel/configuracoes", "Configurações", "engrenagem"],
+  ["/painel/assinatura", "Assinatura", "escudo"],
 ] as const;
 
 export default function Menu() {

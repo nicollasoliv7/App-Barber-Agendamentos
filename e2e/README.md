@@ -31,3 +31,20 @@ Com o app rodando num banco **novo** e a 2ª barbearia criada (`node e2e/outra-b
 ```bash
 node e2e/planos.mjs   # barbearia só por corte, CRM, criar plano, assinante coberto, limite, adicional, pendente/atrasada/cancelada, financeiro, isolamento
 ```
+
+## Assinatura da plataforma + AbacatePay (sem falar com a AbacatePay)
+
+Com um banco **novo**. O mock assina os eventos com HMAC e usa um `id` por evento, como a AbacatePay:
+
+```bash
+node e2e/mock-abacatepay.mjs &        # API v2 falsa na porta 4020
+npm run build
+ABACATEPAY_API_URL=http://localhost:4020 ABACATEPAY_API_KEY=chave-teste-abacate \
+ABACATEPAY_WEBHOOK_SECRET=segredo-webhook-teste ABACATEPAY_WEBHOOK_HMAC_KEY=chave-publica-teste-abacate \
+ABACATEPAY_PRODUTO_MENSAL=prod_mensal ABACATEPAY_PRODUTO_TRIMESTRAL=prod_trimestral ABACATEPAY_PRODUTO_ANUAL=prod_anual \
+ABACATEPAY_PERMITIR_DEVMODE=1 APP_URL=http://localhost:3300 MODO_DEMO=1 npx next start -p 3300
+node e2e/assinatura.mjs               # cadastro, limite de 15, webhook (segredo, HMAC, duplicado), pagamento, renovação, estorno, isolamento
+```
+
+`ABACATEPAY_PERMITIR_DEVMODE=1` é necessário só aqui porque o mock responde como Dev Mode e o `next start` roda em modo produção.
+Sem ela, um pagamento de teste **não** libera plano (é o comportamento de produção; `e2e/assinatura-devmode.mjs` confere isso).

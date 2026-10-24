@@ -9,6 +9,7 @@ import { cnpjValido, cpfValido, dataValida, formatarTelefone, normalizarTelefone
 import { tokenAleatorio } from "./senha";
 import { parametrosModelo, textoConfirmacao, type DadosMensagem } from "./mensagens";
 import { aplicarCobertura, avaliarCobertura } from "./planos-cobertura";
+import { conferirVagaSeNovo } from "./planos-sistema";
 
 export interface NovoAgendamento {
   empresaId: string;
@@ -41,7 +42,8 @@ function validarExtras(campos: CampoPersonalizado[], extras: Record<string, stri
   return limpos;
 }
 
-async function upsertCliente(t: Executor, empresaId: string, nome: string, telefone: string, extras: Record<string, string>) {
+async function upsertCliente(t: Executor, empresaId: string, nome: string, telefone: string, extras: Record<string, string>, painel: boolean) {
+  await conferirVagaSeNovo(t, empresaId, telefone, painel ? "painel" : "publico"); // limite do plano Gratuito
   const [c] = await t.query<{ id: string }>(
     `insert into cliente (empresa_id, nome, telefone, dados_extras) values ($1,$2,$3,$4::jsonb)
      on conflict (empresa_id, telefone) do update
@@ -114,7 +116,7 @@ export async function criarAgendamento(dados: NovoAgendamento): Promise<Agendame
       [dados.empresaId],
     );
 
-    const clienteId = await upsertCliente(t, dados.empresaId, nome, telefone, extras);
+    const clienteId = await upsertCliente(t, dados.empresaId, nome, telefone, extras, painel);
     const inicio = instanteLocal(dados.dia, minuto, cfg.fuso_horario);
     const fim = new Date(inicio.getTime() + serv.duracao_min * 60000);
     // R57: serviço coberto 100% pelo plano do cliente não exige Pix (não há o que cobrar de novo)

@@ -361,3 +361,47 @@ create index if not exists assinatura_uso_ciclo on assinatura_uso (assinatura_id
 
 -- parte do preço do atendimento coberta pelo plano (0 = atendimento avulso). Mantida junto com assinatura_uso.
 alter table agendamento add column if not exists valor_coberto_centavos int not null default 0;
+
+-- v6: assinatura da PLATAFORMA (o que a barbearia paga para usar o Agendou).
+-- Não confundir com os planos que a barbearia vende aos próprios clientes (tabelas plano/assinatura acima).
+-- Sem linha aqui (ou com o período vencido) a barbearia está no plano Gratuito: até 15 clientes cadastrados.
+create table if not exists assinatura_sistema (
+  empresa_id uuid primary key references empresa(id) on delete cascade,
+  plano text not null check (plano in ('mensal','trimestral','anual')),
+  valido_ate timestamptz not null,                   -- fim do período já pago
+  origem text not null default 'pagamento' check (origem in ('pagamento','cortesia')),
+  atualizado_em timestamptz not null default now()
+);
+
+-- cobrança avulsa de um período (1, 3 ou 12 meses) via AbacatePay. Não há renovação automática.
+create table if not exists cobranca_sistema (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresa(id) on delete cascade,
+  plano text not null check (plano in ('mensal','trimestral','anual')),
+  valor_centavos int not null check (valor_centavos > 0),
+  provedor text not null default 'abacatepay',
+  provedor_id text unique,                           -- id do checkout no provedor
+  url text,                                          -- link do checkout
+  status text not null default 'pendente' check (status in ('pendente','pago','expirado','cancelado','estornado')),
+  dev_mode boolean not null default false,           -- criada com chave de teste da AbacatePay
+  periodo_inicio timestamptz,
+  periodo_fim timestamptz,
+  criado_por uuid references usuario_painel(id) on delete set null,
+  criado_em timestamptz not null default now(),
+  pago_em timestamptz,
+  atualizado_em timestamptz not null default now(),
+  check ((status in ('pago','estornado')) = (pago_em is not null))
+);
+create index if not exists cobranca_sistema_empresa on cobranca_sistema (empresa_id, criado_em desc);
+
+-- eventos de webhook já recebidos (AbacatePay): o mesmo id chega em todas as retentativas
+create table if not exists webhook_evento (
+  provedor text not null,
+  evento_id text not null,
+  evento text not null,
+  dev_mode boolean not null default false,
+  recebido_em timestamptz not null default now(),
+  processado_em timestamptz,                         -- null = ainda não processado com sucesso (retentativa reprocessa)
+  resultado text,
+  primary key (provedor, evento_id)
+);
