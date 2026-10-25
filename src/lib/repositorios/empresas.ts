@@ -4,7 +4,7 @@ import { hashSenha } from "../senha";
 import { ErroNegocio } from "../tipos";
 
 /** Endereços que não podem virar página de barbearia (rotas do próprio app). */
-export const SLUGS_RESERVADOS = ["api", "painel", "_next", "cadastro"];
+export const SLUGS_RESERVADOS = ["api", "painel", "_next", "cadastro", "termos", "privacidade"];
 
 function slugBase(nome: string) {
   const s = nome

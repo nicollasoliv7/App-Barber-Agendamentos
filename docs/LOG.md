@@ -1,4 +1,4 @@
-# LOG — App GBarber
+# LOG — Agendou
 
 ## 2026-10-21 — Preparação do ambiente (REA)
 

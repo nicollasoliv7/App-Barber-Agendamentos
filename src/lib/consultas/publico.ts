@@ -17,7 +17,6 @@ export const resumoEmpresaPorSlug = (slug: string) =>
 export const idEmpresaPorSlug = (slug: string) => q1<{ id: string }>(`select id from empresa where slug = $1`, [slug]);
 
 /** Empresa usada como demonstração na página inicial (a primeira cadastrada). */
-export const empresaDemonstracao = () => q<{ nome: string; slug: string }>(`select nome, slug from empresa order by criado_em limit 1`);
 
 export const unidadesAtivas = (empresaId: string) =>
   q<UnidadePub>(`select id, nome, endereco, maps_url from unidade where empresa_id = $1 and ativo order by nome`, [empresaId]);

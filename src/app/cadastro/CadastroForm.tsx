@@ -39,7 +39,17 @@ export default function CadastroForm({ plano }: { plano: string }) {
       <input name="site" tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] h-0 w-0 opacity-0" />
       <label className="flex items-start gap-2 text-xs muted">
         <input type="checkbox" name="termos" required className="mt-0.5" />
-        <span>Li e aceito os termos de uso e a política de privacidade.</span>
+        <span>
+          Li e aceito os{" "}
+          <a href="/termos" target="_blank" rel="noopener" className="text-white underline underline-offset-4">
+            termos de uso
+          </a>{" "}
+          e a{" "}
+          <a href="/privacidade" target="_blank" rel="noopener" className="text-white underline underline-offset-4">
+            política de privacidade
+          </a>
+          .
+        </span>
       </label>
       {estado?.erro && (
         <p role="alert" className="text-sm text-[#ff9aa2]">
