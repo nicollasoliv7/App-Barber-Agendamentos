@@ -84,17 +84,27 @@ async function criarPostgres(url: string): Promise<Driver> {
  * Tolera deslizes comuns ao colar a DATABASE_URL no painel (espaços, aspas, "DATABASE_URL=" junto)
  * e recusa com mensagem clara um valor que não seja um endereço postgres:// — sem nunca exibir a senha.
  */
-export function urlDoBanco(bruto: string | undefined): string | null {
+export function urlDoBanco(bruto: string | undefined, senhaSeparada?: string): string | null {
   let u = (bruto ?? "").trim();
   if (!u) return null;
   u = u.replace(/^DATABASE_URL\s*=\s*/i, "").trim();
   if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) u = u.slice(1, -1).trim();
   if (!/^postgres(ql)?:\/\//i.test(u))
     throw new Error("DATABASE_URL inválida: o valor precisa começar com postgresql:// (confira se não há texto extra antes do endereço).");
+  let url: URL;
   try {
-    new URL(u);
+    url = new URL(u);
   } catch {
     throw new Error("DATABASE_URL inválida: o endereço está mal formado. Se a senha tiver @ # / ? : %, troque por uma só com letras e números.");
+  }
+  // senha em variável separada (DATABASE_PASSWORD): o endereço fica sem segredo e a senha pode ter qualquer caractere
+  const senha = senhaSeparada?.replace(/^\s+|\s+$/g, "");
+  if (senha) {
+    const atual = decodeURIComponent(url.password);
+    if (!atual || /^\[?(YOUR-PASSWORD|SENHA_AQUI|MINHA_SENHA)\]?$/i.test(atual)) {
+      url.password = encodeURIComponent(senha);
+      u = url.toString();
+    }
   }
   return u;
 }
@@ -102,7 +112,7 @@ export function urlDoBanco(bruto: string | undefined): string | null {
 const g = globalThis as unknown as { __agendouDb?: Promise<Driver> };
 
 async function iniciar(): Promise<Driver> {
-  const url = urlDoBanco(process.env.DATABASE_URL);
+  const url = urlDoBanco(process.env.DATABASE_URL, process.env.DATABASE_PASSWORD);
   const d = url ? await criarPostgres(url) : await criarPglite();
   const schema = fs.readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8");
   await d.exec(schema);
