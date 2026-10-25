@@ -13,7 +13,7 @@ A barbearia paga o uso do Agendou pela **AbacatePay (API v2)**, num checkout hos
 
 ## Fluxo
 
-1. A landing leva a `https://app-barber-agendamentos.vercel.app/cadastro?plano=…`. O cadastro cria a barbearia no **Gratuito** e abre o painel.
+1. A landing (`https://site-agendou.vercel.app`) leva a `https://app-agendou.vercel.app/cadastro?plano=…`. O cadastro cria a barbearia no **Gratuito** e abre o painel.
 2. Plano pago: em **Assinatura**, o dono clica em pagar. O servidor cria uma `cobranca_sistema` e chama `POST /v2/checkouts/create` com o produto do plano, `externalId` = id da cobrança e `completionUrl` = `/painel/assinatura?cobranca=<id>`. A chave fica só no servidor.
 3. A AbacatePay avisa em `POST /api/abacatepay/webhook`, e a barbearia volta para a tela de assinatura.
 4. Nos dois casos, o servidor consulta `GET /v2/checkouts/get` e **só então** libera o período (R71). Ao abrir a tela de assinatura, cobranças pendentes das últimas 48 h também são conferidas, para o caso de um webhook se perder.
@@ -26,10 +26,10 @@ A barbearia paga o uso do Agendou pela **AbacatePay (API v2)**, num checkout hos
 2. Crie os **3 produtos avulsos** (sem ciclo/recorrência), com os preços exatos da tabela. Se o preço não bater, o app se recusa a abrir o checkout. Anote o `id` público de cada um.
    - Pelo MCP no Claude Code, no seu computador: `claude mcp add --transport http abacatepay https://mcp.abacatepay.com/mcp --header "Authorization: Bearer SUA_CHAVE_DEV"`. Depois peça para criar ou listar os produtos (`createProduct` / `listProducts`).
 3. Crie o **webhook** (painel da AbacatePay → Webhooks, ou `createWebhook`):
-   - **URL:** `https://app-barber-agendamentos.vercel.app/api/abacatepay/webhook?webhookSecret=SEU_SEGREDO`
+   - **URL:** `https://app-agendou.vercel.app/api/abacatepay/webhook?webhookSecret=SEU_SEGREDO` (o endereço antigo `app-barber-agendamentos.vercel.app` continua funcionando)
    - **secret:** o mesmo `SEU_SEGREDO`
    - **eventos:** `checkout.completed`, `checkout.refunded`, `checkout.disputed`, `checkout.lost`
-4. Na **Vercel → app-barber-agendamentos → Settings → Environment Variables**, cadastre as variáveis abaixo. Não cole nenhum valor em chat.
+4. Na **Vercel → agendou-app → Settings → Environment Variables**, cadastre as variáveis abaixo. Não cole nenhum valor em chat.
 
 | Variável | Valor |
 |---|---|
@@ -37,7 +37,9 @@ A barbearia paga o uso do Agendou pela **AbacatePay (API v2)**, num checkout hos
 | `ABACATEPAY_WEBHOOK_SECRET` | o `SEU_SEGREDO` usado na URL do webhook (ex.: `openssl rand -hex 24`) |
 | `ABACATEPAY_WEBHOOK_HMAC_KEY` | a **chave pública da AbacatePay** publicada em https://docs.abacatepay.com/pages/webhooks/security. Não é segredo, mas é obrigatória em produção |
 | `ABACATEPAY_PRODUTO_MENSAL` / `_TRIMESTRAL` / `_ANUAL` | ids dos produtos |
-| `APP_URL` | `https://app-barber-agendamentos.vercel.app` |
+| `APP_URL` | `https://app-agendou.vercel.app` |
+| `DATABASE_URL` / `DATABASE_PASSWORD` | endereço do Transaction pooler do Supabase **sem senha** / a senha do banco, separada (o app junta as duas) |
+| `SITE_URL` | `https://site-agendou.vercel.app` (a raiz do app redireciona para a landing) |
 | `ABACATEPAY_PERMITIR_DEVMODE` | `1` **somente** enquanto testa com a chave de Dev Mode. Apague antes de ir para produção |
 
 5. Rode `supabase/migrations/20261024030000_assinatura_sistema.sql` e depois `20261024040000_webhook_evento.sql` no SQL Editor do Supabase. Se usar `DATABASE_URL`, o `db/schema.sql` já cobre o banco embutido.

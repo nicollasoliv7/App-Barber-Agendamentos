@@ -44,13 +44,20 @@ function idsDoEvento(data: unknown): string[] {
 export async function POST(req: Request) {
   const segredo = process.env.ABACATEPAY_WEBHOOK_SECRET;
   const recebido = new URL(req.url).searchParams.get("webhookSecret") ?? "";
-  if (!segredo || !iguais(recebido, segredo)) return new Response("Unauthorized", { status: 401 });
+  if (!segredo || !iguais(recebido, segredo)) {
+    // nunca registra os valores, só o motivo
+    log.info(`[abacatepay] webhook recusado: ${!segredo ? "ABACATEPAY_WEBHOOK_SECRET não configurado" : recebido ? "webhookSecret da URL não confere" : "URL sem ?webhookSecret="}`);
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const bruto = await req.text();
   const chaveHmac = chaveHmacWebhook();
   if (chaveHmac) {
     const esperado = crypto.createHmac("sha256", chaveHmac).update(Buffer.from(bruto, "utf8")).digest("base64");
-    if (!iguais(req.headers.get("x-webhook-signature") ?? "", esperado)) return new Response("Unauthorized", { status: 401 });
+    if (!iguais(req.headers.get("x-webhook-signature") ?? "", esperado)) {
+      log.info(`[abacatepay] webhook recusado: ${req.headers.get("x-webhook-signature") ? "X-Webhook-Signature não confere (confira ABACATEPAY_WEBHOOK_HMAC_KEY)" : "sem X-Webhook-Signature"}`);
+      return new Response("Unauthorized", { status: 401 });
+    }
   } else if (process.env.NODE_ENV === "production") {
     log.erro("[abacatepay] webhook recusado: ABACATEPAY_WEBHOOK_HMAC_KEY não configurada");
     return new Response("Webhook não configurado", { status: 503 }); // 5xx: a AbacatePay tenta de novo depois
@@ -62,6 +69,7 @@ export async function POST(req: Request) {
   } catch {
     return new Response("Bad Request", { status: 400 });
   }
+  log.info(`[abacatepay] webhook recebido: ${ev.event ?? "sem evento"}${ev.devMode === true ? " (Dev Mode)" : ""}`);
   if (!ev.event || !EVENTOS.has(ev.event)) return Response.json({ ok: true, ignorado: true });
 
   const eventoId = typeof ev.id === "string" && ev.id.length <= 200 ? ev.id : null;
