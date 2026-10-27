@@ -1,5 +1,6 @@
 import "server-only";
 import type { PlanoPago } from "./planos-sistema";
+import { log } from "./log";
 
 /**
  * Cliente mínimo da API v2 da AbacatePay (https://docs.abacatepay.com).
@@ -69,7 +70,8 @@ function metodos(): string[] {
 }
 
 async function chamar<T>(metodo: "GET" | "POST", caminho: string, corpo?: unknown): Promise<T> {
-  const chave = process.env.ABACATEPAY_API_KEY;
+  // tolera espaços/quebras de linha e um "Bearer " colado junto com a chave
+  const chave = process.env.ABACATEPAY_API_KEY?.trim().replace(/^Bearer\s+/i, "").trim();
   if (!chave) throw new ErroAbacatePay("Pagamento online não configurado (falta ABACATEPAY_API_KEY).");
   let r: Response;
   try {
@@ -86,7 +88,9 @@ async function chamar<T>(metodo: "GET" | "POST", caminho: string, corpo?: unknow
   const j = (await r.json().catch(() => null)) as { data?: T; error?: string | null; success?: boolean } | null;
   if (!r.ok || !j || j.error || !j.data) {
     const motivo = j?.error ?? `HTTP ${r.status}`;
-    throw new ErroAbacatePay(r.status === 401 ? "A AbacatePay recusou a chave da API (ABACATEPAY_API_KEY)." : `AbacatePay: ${motivo}`);
+    if (r.status === 401 || r.status === 403)
+      log.erro(`[abacatepay] chave recusada (HTTP ${r.status}, chave com ${chave.length} caracteres${/\s/.test(chave) ? ", contém espaço" : ""}): ${typeof j?.error === "string" ? j.error.slice(0, 120) : "sem detalhe"}`);
+    throw new ErroAbacatePay(r.status === 401 || r.status === 403 ? "A AbacatePay recusou a chave da API (ABACATEPAY_API_KEY)." : `AbacatePay: ${motivo}`);
   }
   return j.data;
 }
