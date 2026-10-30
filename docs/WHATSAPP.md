@@ -9,6 +9,7 @@ O Agendou envia mensagens pela **WhatsApp Cloud API**, a API oficial da Meta. Ca
 | Confirmação | Ao criar o agendamento confirmado (ou quando o Pix é pago) | Modelo de confirmação aprovado |
 | Lembrete | `LEMBRETE_HORAS_ANTES` horas antes (padrão 3), uma vez só | Modelo de lembrete aprovado + "Enviar lembrete automático" ligado |
 | Código de verificação | Quando o cliente entra em "Meus agendamentos" | Modelo de autenticação aprovado |
+| Cobrança de mensalidade | Régua automática: X dias antes do vencimento, no vencimento e Y dias depois | Modelo de cobrança aprovado + cobrancas ativas + chave Pix configurada |
 | Teste | Botão "Enviar teste" no painel | Número conectado (usa o `hello_world` se não houver modelo) |
 | Cancelamento, remarcação, aviso à barbearia | Ficam registrados em Notificações, mas **não são enviados** automaticamente | Ainda não têm modelo próprio |
 
@@ -66,20 +67,60 @@ O Agendou envia mensagens pela **WhatsApp Cloud API**, a API oficial da Meta. Ca
    - `confirmacao_agendamento` (Utilidade)
    - `lembrete_agendamento` (Utilidade)
    - `codigo_verificacao` (Autenticação, botão "Copiar código")
+   - `cobranca_mensalidade` (Utilidade, 5 variáveis — veja abaixo)
 
    A aprovação costuma levar de minutos a algumas horas. Depois, informe os nomes no painel e clique em **Salvar**: o sistema confere se estão aprovados.
 6. **Primeiro envio:** use **3. Primeiro envio (teste)** com o seu celular. Enquanto o app da Meta estiver em modo de desenvolvimento, cadastre o celular como destinatário de teste (Configuração da API → "Para"). Senão a Meta responde *"número fora da lista de teste"* (código 131030), e o painel mostra exatamente isso.
 7. **Confirmação:** faça um agendamento na página pública. Em **Notificações**, a confirmação deve passar de "Aceita pela Meta" para "Entregue" e "Lida".
 
-### Variáveis do modelo (ordem fixa)
+### Variáveis dos modelos (ordem fixa)
+
+**Confirmação e lembrete de agendamento** (`confirmacao_agendamento`, `lembrete_agendamento`):
 
 `{{1}}` primeiro nome · `{{2}}` barbearia · `{{3}}` serviço · `{{4}}` profissional · `{{5}}` data e hora · `{{6}}` link para remarcar/cancelar
 
 Modelos com menos variáveis também funcionam: o sistema conta as variáveis do modelo aprovado e envia só as primeiras. O limite é 6.
 
-### Lembretes em produção (Vercel)
+**Cobrança de mensalidade** (`cobranca_mensalidade`):
 
-As rotinas internas ficam desligadas em serverless. Agende uma chamada a `POST /api/cron/lembretes` com o cabeçalho `x-cron-secret: <CRON_SECRET>` a cada 10 a 30 minutos, usando um serviço de cron externo. O plano gratuito da Vercel só permite cron diário.
+`{{1}}` primeiro nome · `{{2}}` nome do plano · `{{3}}` valor (ex.: `R$ 89,90`) · `{{4}}` data de vencimento (ex.: `31/12/2026`) · `{{5}}` Pix copia-e-cola (código EMV/BR Code)
+
+Texto sugerido para criar o modelo no WhatsApp Manager:
+
+```
+Olá {{1}}, a mensalidade do plano "{{2}}" ({{3}}) vence em {{4}}.
+Pague com Pix: {{5}}
+```
+
+O Pix copia-e-cola é gerado dinamicamente (EMV BR Code estático, CRC16-CCITT) com a chave Pix configurada no painel → **WhatsApp → Cobrança automática**.
+
+### Cobrança automática de mensalidade — régua configurável (R76–R87)
+
+A régua envia mensagens automáticas em três etapas: **antes** do vencimento, **no** vencimento e **depois**. Os dias são configuráveis por barbearia (padrão: 3 antes e 3 depois).
+
+**Para ativar:**
+1. Cadastre a chave Pix da barbearia em **painel → WhatsApp → Cobrança automática** (tipo, chave, nome do recebedor, cidade).
+2. Crie e aprove o modelo `cobranca_mensalidade` no WhatsApp Manager.
+3. Em **painel → WhatsApp**, informe o nome do modelo no campo "Modelo de cobrança", ajuste os dias da régua e marque "Cobranças ativas".
+
+**Comportamento da régua:**
+- Cada etapa (antes / vencimento / depois) é enviada **uma única vez** por mensalidade — não há duplicidade mesmo que o cron rode várias vezes.
+- O barbeiro pode **pausar** a régua para um assinante específico na ficha do cliente.
+- Se o cliente responder **PARAR** (ou `parar`, case-insensitive), o opt-out é registrado automaticamente e a régua para para aquele cliente. O barbeiro pode reativar na ficha.
+- A régua só envia entre **9h e 20h** no fuso horário da empresa.
+- Quando a mensalidade é paga ou a assinatura é cancelada, a régua para automaticamente.
+- **"Cobrar agora"**: botão na ficha do cliente para envio manual imediato. Limitado a 1 disparo por mensalidade por dia.
+
+### Rotinas automáticas em produção (Vercel)
+
+As rotinas internas ficam desligadas em serverless. Use um serviço de cron externo (ex.: cron-job.org, EasyCron) para chamar ambas as rotas com o cabeçalho `x-cron-secret: <CRON_SECRET>`:
+
+| Rota | Frequência sugerida | O que faz |
+|---|---|---|
+| `POST /api/cron/lembretes` | A cada 10–30 min | Lembretes de agendamento (R14b) |
+| `POST /api/cron/cobrancas` | A cada 30–60 min | Régua de cobrança de mensalidade (R84) |
+
+O plano gratuito da Vercel só permite cron diário — as rotinas internas (`instrumentation.ts`) cobrem o ambiente local e self-hosted, mas em Vercel Hobby é preciso o cron externo para ambas.
 
 ## Custos e limites (Meta)
 
@@ -101,3 +142,13 @@ Hoje, cada barbearia cola as próprias credenciais. Para muitas barbearias, o ca
 - teste com erro da Meta, código com botão e lembretes;
 - token revogado e reconexão;
 - desconexão.
+
+`e2e/cobrancas.mjs` testa a régua de cobrança de mensalidade:
+- segurança do endpoint (`/api/cron/cobrancas`);
+- skip quando sem `cobrancas_ativas` ou sem chave Pix;
+- configuração via painel (Pix + modelo + régua);
+- opt-out "PARAR" (case-insensitive) + reativação pelo painel;
+- pausa e retomada por assinante;
+- "Cobrar agora" + idempotência (1 disparo/mensalidade/dia);
+- CRC16 do Pix copia-e-cola (param[5]);
+- isolamento entre barbearias.

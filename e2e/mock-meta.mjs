@@ -26,6 +26,13 @@ const MODELOS = [
     category: "AUTHENTICATION",
     components: [{ type: "BODY", text: "*{{1}}* é seu código de verificação." }, { type: "BUTTONS", buttons: [{ type: "OTP", otp_type: "COPY_CODE" }] }],
   },
+  {
+    name: "cobranca_mensalidade",
+    language: "pt_BR",
+    status: "APPROVED",
+    category: "UTILITY",
+    components: [{ type: "BODY", text: "Olá {{1}}, a mensalidade do plano \"{{2}}\" ({{3}}) vence em {{4}}.\nPague com Pix: {{5}}" }],
+  },
   { name: "modelo_em_analise", language: "pt_BR", status: "PENDING", category: "UTILITY", components: [{ type: "BODY", text: "Oi {{1}}" }] },
   { name: "hello_world", language: "en_US", status: "APPROVED", category: "UTILITY", components: [{ type: "BODY", text: "Hello World" }] },
 ];

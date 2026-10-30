@@ -61,14 +61,27 @@ export interface ModelosConexao {
   codigo: string | null;
   codigoBotao: boolean;
   lembretesAtivos: boolean;
+  cobranca: string | null;
+  cobrancaParams: number | null;
+  cobrancasAtivas: boolean;
+  cobrancaDiasAntes: number;
+  cobrancaDiasDepois: number;
 }
 
 export async function gravarModelos(empresaId: string, m: ModelosConexao) {
   await q(
-    `update whatsapp_conexao set idioma = $2, modelo_confirmacao = $3, modelo_confirmacao_params = $4, modelo_lembrete = $5, modelo_lembrete_params = $6,
-         modelo_codigo = $7, modelo_codigo_botao = $8, lembretes_ativos = $9
+    `update whatsapp_conexao
+       set idioma = $2, modelo_confirmacao = $3, modelo_confirmacao_params = $4,
+           modelo_lembrete = $5, modelo_lembrete_params = $6,
+           modelo_codigo = $7, modelo_codigo_botao = $8, lembretes_ativos = $9,
+           modelo_cobranca = $10, modelo_cobranca_params = $11,
+           cobrancas_ativas = $12, cobranca_dias_antes = $13, cobranca_dias_depois = $14
        where empresa_id = $1`,
-    [empresaId, m.idioma, m.confirmacao, m.confirmacaoParams, m.lembrete, m.lembreteParams, m.codigo, m.codigoBotao, m.lembretesAtivos],
+    [
+      empresaId, m.idioma, m.confirmacao, m.confirmacaoParams, m.lembrete, m.lembreteParams,
+      m.codigo, m.codigoBotao, m.lembretesAtivos,
+      m.cobranca, m.cobrancaParams, m.cobrancasAtivas, m.cobrancaDiasAntes, m.cobrancaDiasDepois,
+    ],
   );
 }
 

@@ -7,6 +7,7 @@ import { formatarTelefone, isUuid } from "@/lib/validacao";
 import { Icone, Kpi, StatusBadge } from "@/components/ui";
 import { salvarCliente } from "../../../acoes";
 import PlanoDoCliente from "./PlanoDoCliente";
+import CobrancasDoCliente from "./cobrancas";
 import { Campo, Form } from "../../../Form";
 
 export const metadata = { title: "Ficha do cliente" };
@@ -115,6 +116,7 @@ export default async function FichaCliente({ params }: PageProps<"/painel/client
 
         <div className="grid content-start gap-6">
           <PlanoDoCliente clienteId={c.id} empresaId={u.empresa_id} gestor={u.papel === "dono" || u.papel === "admin"} />
+          <CobrancasDoCliente clienteId={c.id} empresaId={u.empresa_id} />
           <section className="card p-4" aria-labelledby="titulo-dados">
             <h2 id="titulo-dados" className="mb-3 font-medium">
               Dados do cliente

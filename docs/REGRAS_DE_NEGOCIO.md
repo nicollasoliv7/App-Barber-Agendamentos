@@ -107,10 +107,27 @@ Princípio: barbearias que cobram só por corte, só por mensalidade ou pelos do
 - **R63 · Cancelamento e remarcação** — Cancelar o atendimento devolve o uso ao ciclo. Remarcar recalcula a cobertura, porque a nova data pode cair em outro ciclo. Cancelar a assinatura tira a cobertura dos atendimentos **futuros**; os passados continuam como estavam.
 - **R64 · Financeiro** — Receita de **atendimentos** = valor não coberto dos atendimentos concluídos. Receita de **planos** = mensalidades pagas. O uso de benefício **não é receita**: aparece como "atendimentos cobertos". "A receber" = saldo dos atendimentos concluídos + mensalidades pendentes. Comissões continuam sobre o valor do serviço realizado (inclusive os cobertos). Ticket médio considera só atendimentos com valor a receber.
 - **R65 · Cliente recorrente** — 3 ou mais atendimentos concluídos nos últimos 90 dias, **com ou sem plano**. Aparece no CRM (segmento e selo) e no dashboard.
-- **R66 · Sem gateway** — Não existe cobrança automática de mensalidade: os pagamentos são registrados pelo barbeiro (Pix, dinheiro, cartão, transferência, outro). A cobrança recorrente automática depende de um gateway e de credenciais externas.
+- **R66 · Confirmação manual de pagamento** — Os pagamentos de mensalidade são registrados pelo barbeiro (Pix, dinheiro, cartão, transferência, outro). Não há cobrança automática via gateway; a régua de cobrança (R76–R87) apenas envia lembretes/cobranças via WhatsApp.
 - **R67 · Editar agendamento pelo painel** — Data, hora, profissional e observação de agendamentos em aberto. A edição respeita expediente, folgas e conflitos (ignora a antecedência mínima), avisa o cliente sobre a remarcação e recalcula a cobertura do plano.
 
-## 12. Assinatura da plataforma — AbacatePay (v6)
+## 12. Cobrança automática de mensalidade via WhatsApp (v7)
+
+Módulo opcional que complementa a seção 11. Requer número WhatsApp conectado (R50), modelo `cobranca_mensalidade` aprovado e chave Pix configurada.
+
+- **R76 · Régua configurável** — `cobrancas_ativas` (toggle por barbearia). Etapas automáticas: **antes** (`cobranca_dias_antes` dias antes do vencimento, padrão 3), **no vencimento** e **depois** (`cobranca_dias_depois` dias depois, padrão 3). O barbeiro pode pausar a régua para um assinante específico (`assinatura.cobranca_pausada`).
+- **R77 · Idempotência** — No máximo 1 mensagem automática por `(cobranca_id, etapa)`: a mesma etapa nunca é reenviada, mesmo que o cron rode várias vezes. Para a etapa manual ("Cobrar agora"), no máximo 1 por `(cobranca_id, dia)` — dois disparos manuais no mesmo dia ignoram o segundo. Etapas automáticas e manuais são independentes entre si.
+- **R78 · Mensagem** — Usa o modelo `cobranca_mensalidade` (categoria Utilidade, 5 variáveis): `{{1}}` primeiro nome, `{{2}}` nome do plano, `{{3}}` valor formatado, `{{4}}` data de vencimento, `{{5}}` Pix copia-e-cola (EMV BR Code estático, CRC16-CCITT-FALSE).
+- **R79 · Chave Pix obrigatória** — Tipo (`cpf` · `cnpj` · `telefone` · `email` · `aleatoria`), chave, nome do recebedor (máx 25 chars) e cidade (máx 15 chars). Validada ao salvar. Obrigatória para ativar `cobrancas_ativas`; sem ela, o toggle retorna erro explicativo.
+- **R80 · Parada automática** — A régua para quando a mensalidade fica `paga` ou `cancelada`, ou quando a assinatura é `cancelada`. Etapas que deveriam ter sido enviadas antes desse evento são simplesmente ignoradas (não há envio retroativo).
+- **R81 · Envio via notificar()** — O envio usa `notificar()` + `despachar()` (R50, R54): toda mensagem sai pelo número da própria barbearia e segue o ciclo de status (aceito → entregue → lida).
+- **R82 · Sem conexão ou sem modelo** — Comportamento igual ao R54/R55: `nao_enviado` na notificação. A ficha do cliente mostra o botão WhatsApp (`wa.me`) com a mensagem pronta.
+- **R83 · Envio após commit** — Mesma garantia do R56: a falha no WhatsApp nunca desfaz nem bloqueia a mensalidade.
+- **R84 · Cron** — `POST /api/cron/cobrancas` protegido por `x-cron-secret`. `instrumentation.ts` inclui a função no tick de 60 s (ambientes não-serverless). Em Vercel Hobby, usar cron externo a cada 30–60 min (veja WHATSAPP.md). A régua só processa empresas com `cobrancas_ativas = true`, modelo e Pix configurados, e só envia entre **9h e 20h** no fuso da empresa. Limite de 50 cobranças por empresa por execução.
+- **R85 · "Cobrar agora"** — Botão na ficha do cliente que dispara a etapa `"manual"` imediatamente, sem interferir nas etapas automáticas. Idempotência: no máximo 1 envio manual por mensalidade por dia (`dia` = data local da empresa no momento do clique). Disponível enquanto a mensalidade estiver `pendente`.
+- **R86 · Confirmação de pagamento** — Segue R66: o barbeiro registra o pagamento manualmente ("Recebi"). A régua para automaticamente quando a mensalidade fica `paga`.
+- **R87 · Opt-out** — Quando o cliente responde **PARAR** (ou variação de maiúsculas/minúsculas) ao número da barbearia, o sistema registra o opt-out em `assinatura_optout_cobranca(empresa_id, cliente_id)`. A régua para para aquele cliente naquela barbearia; a assinatura não é cancelada. O barbeiro vê o opt-out na ficha do cliente e pode reativar manualmente. O opt-out persiste mesmo que o cliente cancele e reassine um plano.
+
+## 13. Assinatura da plataforma — AbacatePay (v6)
 Não confundir com a seção 11: aqui é o que a **barbearia paga para usar o Agendou**.
 
 - **R68 · Planos** — Gratuito (R$ 0, até **15 clientes cadastrados**), Mensal (R$ 59,90 → 1 mês), Trimestral (R$ 159,90 → 3 meses), Anual (R$ 599,90 → 12 meses). Os recursos são os mesmos em todos; a única diferença é o limite do Gratuito. O limite conta clientes da barbearia (tabela `cliente`), não usuários do painel.

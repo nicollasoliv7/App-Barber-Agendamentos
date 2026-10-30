@@ -394,6 +394,64 @@ create table if not exists cobranca_sistema (
 );
 create index if not exists cobranca_sistema_empresa on cobranca_sistema (empresa_id, criado_em desc);
 
+-- cobrança automática de mensalidade: pausa por assinante (R76)
+alter table assinatura add column if not exists cobranca_pausada boolean not null default false;
+
+-- chave Pix da barbearia para geração do BR Code (R79)
+create table if not exists config_pix (
+  empresa_id    uuid primary key references empresa(id) on delete cascade,
+  tipo          text not null check (tipo in ('cpf','cnpj','telefone','email','aleatoria')),
+  chave         text not null,
+  recebedor     text not null check (char_length(recebedor) between 1 and 25),
+  cidade        text not null check (char_length(cidade) between 1 and 15),
+  criado_em     timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+-- unique composto em assinatura_cobranca para FK composta da etapa
+alter table assinatura_cobranca
+  add constraint if not exists assinatura_cobranca_id_empresa_key unique (id, empresa_id);
+
+-- unique composto em cliente para FK composta do opt-out
+alter table cliente
+  add constraint if not exists cliente_id_empresa_key unique (id, empresa_id);
+
+-- idempotência de envio: uma mensagem por (cobrança, etapa) — R77
+create table if not exists cobranca_mensalidade_etapa (
+  id             uuid not null default gen_random_uuid() primary key,
+  empresa_id     uuid not null,
+  cobranca_id    uuid not null,
+  etapa          text not null check (etapa in ('antes','vencimento','depois','manual')),
+  dia            date not null,
+  notificacao_id uuid references notificacao(id) on delete set null,
+  criado_em      timestamptz not null default now(),
+  foreign key (cobranca_id, empresa_id)
+    references assinatura_cobranca (id, empresa_id) on delete cascade
+);
+create unique index if not exists cobranca_etapa_auto_uq
+  on cobranca_mensalidade_etapa (cobranca_id, etapa) where etapa <> 'manual';
+create unique index if not exists cobranca_etapa_manual_dia_uq
+  on cobranca_mensalidade_etapa (cobranca_id, dia) where etapa = 'manual';
+
+-- opt-out de cobrança por cliente (R87): "PARAR" via WhatsApp
+create table if not exists assinatura_optout_cobranca (
+  empresa_id  uuid not null,
+  cliente_id  uuid not null,
+  criado_em   timestamptz not null default now(),
+  primary key (empresa_id, cliente_id),
+  foreign key (cliente_id, empresa_id) references cliente (id, empresa_id) on delete cascade
+);
+
+-- whatsapp_conexao: campos de cobrança automática (R76, R78, R84)
+alter table whatsapp_conexao
+  add column if not exists modelo_cobranca        text,
+  add column if not exists modelo_cobranca_params int check (modelo_cobranca_params between 0 and 10),
+  add column if not exists cobrancas_ativas       boolean not null default false,
+  add column if not exists cobranca_dias_antes    int not null default 3
+    check (cobranca_dias_antes between 1 and 30),
+  add column if not exists cobranca_dias_depois   int not null default 3
+    check (cobranca_dias_depois between 1 and 30);
+
 -- eventos de webhook já recebidos (AbacatePay): o mesmo id chega em todas as retentativas
 create table if not exists webhook_evento (
   provedor text not null,

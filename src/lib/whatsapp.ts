@@ -199,6 +199,11 @@ export interface ConexaoWhatsapp {
   modelo_codigo: string | null;
   modelo_codigo_botao: boolean;
   lembretes_ativos: boolean;
+  modelo_cobranca: string | null;
+  modelo_cobranca_params: number | null;
+  cobrancas_ativas: boolean;
+  cobranca_dias_antes: number;
+  cobranca_dias_depois: number;
   status: "conectado" | "erro";
   ultimo_erro: string | null;
   verificado_em: Date;
