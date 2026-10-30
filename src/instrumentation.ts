@@ -15,8 +15,10 @@ export async function register() {
     try {
       const { expirarPendentes } = await import("./lib/disponibilidade");
       const { enviarLembretes } = await import("./lib/lembretes");
+      const { enviarCobrancas } = await import("./lib/cobrancas-mensalidade");
       await expirarPendentes();
       await enviarLembretes();
+      await enviarCobrancas();
     } catch (e) {
       log.erro("[agendou] rotina falhou:", e);
     }
