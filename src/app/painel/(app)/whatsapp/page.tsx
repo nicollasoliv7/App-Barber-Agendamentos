@@ -28,8 +28,15 @@ const MODELOS = [
   {
     nome: "codigo_verificacao",
     titulo: "Código de verificação (histórico do cliente)",
-    categoria: "Autenticação · botão “Copiar código”",
-    texto: "O texto é gerado pela Meta: “{{1}} é seu código de verificação.”",
+    categoria: "Autenticação · botão \"Copiar código\"",
+    texto: "O texto é gerado pela Meta: \"{{1}} é seu código de verificação.\"",
+  },
+  {
+    nome: "cobranca_mensalidade",
+    titulo: "Cobrança de mensalidade",
+    categoria: "Utilidade",
+    texto:
+      "Olá, {{1}}! A mensalidade {{2}} no valor de {{3}} vence em {{4}}. Para pagar via Pix, copie o código abaixo:\n{{5}}",
   },
 ];
 
@@ -171,11 +178,49 @@ export default async function Page() {
                 <Campo rotulo="Idioma dos modelos">
                   <input name="idioma" defaultValue={c.idioma} className={inp} />
                 </Campo>
+                <Campo rotulo="Modelo de cobrança de mensalidade (5 variáveis)">
+                  <input
+                    name="modelo_cobranca"
+                    defaultValue={(c as unknown as Record<string, unknown>).modelo_cobranca as string ?? ""}
+                    placeholder="cobranca_mensalidade"
+                    className={inp}
+                  />
+                </Campo>
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="lembretes_ativos" defaultChecked={c.lembretes_ativos} /> Enviar lembrete automático{" "}
                 {process.env.LEMBRETE_HORAS_ANTES ?? 3}h antes do horário
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="cobrancas_ativas"
+                  defaultChecked={!!((c as unknown as Record<string, unknown>).cobrancas_ativas)}
+                />{" "}
+                Ativar cobrança automática de mensalidade
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo rotulo="Dias antes do vencimento (1–30)">
+                  <input
+                    name="cobranca_dias_antes"
+                    type="number"
+                    min={1}
+                    max={30}
+                    defaultValue={((c as unknown as Record<string, unknown>).cobranca_dias_antes as number) ?? 3}
+                    className={inp}
+                  />
+                </Campo>
+                <Campo rotulo="Dias após o vencimento (1–30)">
+                  <input
+                    name="cobranca_dias_depois"
+                    type="number"
+                    min={1}
+                    max={30}
+                    defaultValue={((c as unknown as Record<string, unknown>).cobranca_dias_depois as number) ?? 3}
+                    className={inp}
+                  />
+                </Campo>
+              </div>
             </Form>
           ) : (
             <p className="rounded-lg border border-dashed border-white/15 p-4 text-sm muted">Conecte o número primeiro.</p>
@@ -226,7 +271,7 @@ export default async function Page() {
             Avisos de entrega (webhook)
           </h2>
           <p className="mb-3 text-xs muted">
-            É assim que sabemos se a mensagem foi <b>enviada, entregue, lida ou falhou</b>. Sem isso, o máximo que mostramos é “aceita pela Meta”.
+            É assim que sabemos se a mensagem foi <b>enviada, entregue, lida ou falhou</b>. Sem isso, o máximo que mostramos é &ldquo;aceita pela Meta&rdquo;.
           </p>
           <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] p-2 pl-3 text-sm">
             <span className="mono min-w-0 flex-1 truncate">{urlWebhook}</span>
@@ -242,7 +287,19 @@ export default async function Page() {
               {webhookPronto ? "disponível" : "não definido (WHATSAPP_APP_SECRET)"}
             </li>
           </ul>
-          <p className="mt-2 text-xs faint">No app da Meta: WhatsApp → Configuração → Webhook. Assine o campo “messages”.</p>
+          <p className="mt-2 text-xs faint">No app da Meta: WhatsApp → Configuração → Webhook. Assine o campo &ldquo;messages&rdquo;.</p>
+        </section>
+
+        <section className={card} aria-labelledby="titulo-cobranca-link">
+          <h2 id="titulo-cobranca-link" className="font-medium">
+            Cobrança automática de mensalidade
+          </h2>
+          <p className="mt-1 mb-3 text-sm muted">
+            Configure a chave Pix da barbearia e o modelo de mensagem para enviar cobranças automáticas a assinantes com mensalidade pendente.
+          </p>
+          <Link href="/painel/whatsapp/cobranca" className="btn btn-sutil text-sm">
+            Configurar cobrança →
+          </Link>
         </section>
 
         <section className={`${card} xl:col-span-2`} aria-labelledby="titulo-manual">
@@ -257,7 +314,7 @@ export default async function Page() {
               <Icone nome="whatsapp" tamanho={13} /> WhatsApp
             </span>{" "}
             que abre a conversa com a mensagem pronta. Na página pública, se a confirmação automática não sair, o cliente vê um botão para avisar a barbearia pelo
-            WhatsApp. Esses envios dependem de você (ou do cliente) tocar em “enviar” e não são marcados como enviados no sistema.
+            WhatsApp. Esses envios dependem de você (ou do cliente) tocar em &ldquo;enviar&rdquo; e não são marcados como enviados no sistema.
           </p>
         </section>
       </div>

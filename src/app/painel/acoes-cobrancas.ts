@@ -65,7 +65,7 @@ export async function salvarPixAcao(_: Estado, f: FormData): Promise<Estado> {
  * Dispara uma mensagem de cobrança manual (etapa "manual") para uma mensalidade.
  * Respeita a idempotência: no máximo 1 por cobrança por dia (R85).
  */
-export async function cobrarAgoraAcao(f: FormData): Promise<Estado> {
+export async function cobrarAgoraAcao(_: Estado, f: FormData): Promise<Estado> {
   try {
     const u = await usuario();
     const cobrancaId = txt(f, "cobranca_id");
@@ -88,7 +88,7 @@ export async function cobrarAgoraAcao(f: FormData): Promise<Estado> {
 // ---------------------------------------------------------------- Pausar assinante
 
 /** Liga ou desliga a régua de cobrança para um assinante específico (R76). */
-export async function pausarAssinanteAcao(f: FormData): Promise<Estado> {
+export async function pausarAssinanteAcao(_: Estado, f: FormData): Promise<Estado> {
   try {
     const u = await usuario();
     const assinaturaId = txt(f, "assinatura_id");
@@ -107,7 +107,7 @@ export async function pausarAssinanteAcao(f: FormData): Promise<Estado> {
 // ---------------------------------------------------------------- Reativar opt-out
 
 /** Remove o opt-out de um cliente (R87 — reativação manual pelo barbeiro). */
-export async function reativarOptoutAcao(f: FormData): Promise<Estado> {
+export async function reativarOptoutAcao(_: Estado, f: FormData): Promise<Estado> {
   try {
     const u = await gestor();
     const clienteId = txt(f, "cliente_id");

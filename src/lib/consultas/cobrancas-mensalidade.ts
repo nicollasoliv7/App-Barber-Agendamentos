@@ -142,6 +142,49 @@ export async function historicoEtapas(cobrancaId: string, empresaId: string): Pr
   );
 }
 
+// -------------------------------------------------------------------------
+// UI: ficha do cliente — bloco de cobrança
+// -------------------------------------------------------------------------
+
+export interface AssinaturaCobrancaResumida {
+  id: string;
+  plano: string;
+  status: string;
+  cobranca_pausada: boolean;
+}
+
+/** Assinaturas não-canceladas de um cliente, com status de pausa de cobrança. */
+export async function assinaturasCobrancaCliente(clienteId: string, empresaId: string): Promise<AssinaturaCobrancaResumida[]> {
+  return q<AssinaturaCobrancaResumida>(
+    `select a.id, p.nome as plano, a.status, a.cobranca_pausada
+     from assinatura a
+     join plano p on p.id = a.plano_id and p.empresa_id = a.empresa_id
+     where a.cliente_id = $1 and a.empresa_id = $2 and a.status <> 'cancelada'
+     order by a.criado_em desc`,
+    [clienteId, empresaId],
+  );
+}
+
+export interface CobrancaPendenteCliente {
+  id: string;
+  assinatura_id: string;
+  vencimento: string;
+  valor_centavos: number;
+}
+
+/** Mensalidades pendentes de um cliente (todas as assinaturas ativas). */
+export async function cobrancasPendentesCliente(clienteId: string, empresaId: string): Promise<CobrancaPendenteCliente[]> {
+  return q<CobrancaPendenteCliente>(
+    `select ac.id, ac.assinatura_id, ac.vencimento::text as vencimento, ac.valor_centavos
+     from assinatura_cobranca ac
+     join assinatura a on a.id = ac.assinatura_id and a.empresa_id = ac.empresa_id
+     where a.cliente_id = $1 and ac.empresa_id = $2
+       and ac.status = 'pendente' and a.status <> 'cancelada'
+     order by ac.vencimento asc`,
+    [clienteId, empresaId],
+  );
+}
+
 /** Verifica se o cliente tem opt-out de cobrança nesta empresa. */
 export async function clienteTemOptout(empresaId: string, clienteId: string): Promise<boolean> {
   const r = await q1(
