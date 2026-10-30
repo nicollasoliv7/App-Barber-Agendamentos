@@ -1,0 +1,45 @@
+name: Cron jobs (lembretes + cobranças)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # lembretes — a cada 15 min
+    - cron: "*/30 * * * *"   # cobranças — a cada 30 min
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job a executar manualmente"
+        required: true
+        default: lembretes
+        type: choice
+        options: [lembretes, cobrancas, ambos]
+
+jobs:
+  lembretes:
+    name: Lembretes de agendamento
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'lembretes' || github.event.inputs.job == 'ambos') ||
+      github.event_name == 'schedule'
+    steps:
+      - name: POST /api/cron/lembretes
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ vars.APP_URL }}/api/cron/lembretes" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  cobrancas:
+    name: Cobranças de mensalidade
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'cobrancas' || github.event.inputs.job == 'ambos') ||
+      (github.event_name == 'schedule' && startsWith(github.event.schedule, '*/30'))
+    steps:
+      - name: POST /api/cron/cobrancas
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ vars.APP_URL }}/api/cron/cobrancas" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
