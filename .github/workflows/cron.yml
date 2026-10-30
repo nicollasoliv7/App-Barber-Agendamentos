@@ -24,7 +24,7 @@ jobs:
       - name: POST /api/cron/lembretes
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ vars.APP_URL }}/api/cron/lembretes" \
+            -X POST "https://app-agendou.vercel.app/api/cron/lembretes" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
           echo "Status: $STATUS"
           [ "$STATUS" = "200" ] || exit 1
@@ -39,7 +39,7 @@ jobs:
       - name: POST /api/cron/cobrancas
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ vars.APP_URL }}/api/cron/cobrancas" \
+            -X POST "https://app-agendou.vercel.app/api/cron/cobrancas" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
           echo "Status: $STATUS"
           [ "$STATUS" = "200" ] || exit 1
