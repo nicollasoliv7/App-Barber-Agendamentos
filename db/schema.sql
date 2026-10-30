@@ -409,12 +409,14 @@ create table if not exists config_pix (
 );
 
 -- unique composto em assinatura_cobranca para FK composta da etapa
-alter table assinatura_cobranca
-  add constraint if not exists assinatura_cobranca_id_empresa_key unique (id, empresa_id);
+do $$ begin
+  alter table assinatura_cobranca add constraint assinatura_cobranca_id_empresa_key unique (id, empresa_id);
+exception when duplicate_object then null; end $$;
 
 -- unique composto em cliente para FK composta do opt-out
-alter table cliente
-  add constraint if not exists cliente_id_empresa_key unique (id, empresa_id);
+do $$ begin
+  alter table cliente add constraint cliente_id_empresa_key unique (id, empresa_id);
+exception when duplicate_object then null; end $$;
 
 -- idempotência de envio: uma mensagem por (cobrança, etapa) — R77
 create table if not exists cobranca_mensalidade_etapa (
