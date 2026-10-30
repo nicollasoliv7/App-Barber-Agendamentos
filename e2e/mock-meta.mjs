@@ -54,6 +54,7 @@ http
 
     // controles do teste
     if (u.pathname === "/__enviadas") return json(res, enviadas);
+    if (u.pathname === "/__reset") return enviadas.splice(0, enviadas.length), (revogado = false), (seq = 0), json(res, { ok: true });
     if (u.pathname === "/__revogar") return (revogado = u.searchParams.get("v") !== "0"), json(res, { revogado });
 
     const partes = u.pathname.split("/").filter(Boolean); // [v25.0, id, sub?]

@@ -18,6 +18,9 @@ const confere = (ok, msg, extra = "") => {
 };
 const enviadas = async () => (await fetch(`${MOCK}/__enviadas`)).json();
 
+// Limpa estado acumulado de runs anteriores (ex: mensagens de outros testes)
+await fetch(`${MOCK}/__reset`, { method: "POST" }).catch(() => {});
+
 /** Agenda pela API pública (como a página faz) e devolve a resposta. */
 let usados = 0;
 async function agendar(nome, telefone) {
@@ -55,6 +58,7 @@ async function entrar(telefone) {
   const p = await ctx.newPage();
   p.on("pageerror", (e) => erros.push(e.message));
   await p.goto(`${URL}/painel/login`);
+  await p.waitForLoadState("networkidle");
   await p.fill("input[name=telefone]", telefone);
   await p.fill("input[name=senha]", "agendou123");
   await p.click("button:has-text('Entrar')");

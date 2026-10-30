@@ -53,7 +53,7 @@ export default async function Page() {
           {!gestor ? (
             <p className="text-sm muted">Só o dono ou um administrador pode configurar a chave Pix.</p>
           ) : (
-            <Form action={salvarPixAcao} className="grid gap-3">
+            <Form action={salvarPixAcao} botao="Salvar chave Pix" className="grid gap-3">
               <Campo rotulo="Tipo de chave">
                 <select name="pix_tipo" defaultValue={pix?.tipo ?? "aleatoria"} className={inp}>
                   {TIPOS_PIX.map((t) => (

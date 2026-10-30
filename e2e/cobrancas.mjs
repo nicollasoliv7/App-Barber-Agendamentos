@@ -79,6 +79,7 @@ async function entrar(telefone) {
   const pg = await ctx.newPage();
   pg.on("pageerror", (e) => erros.push(e.message));
   await pg.goto(`${URL_BASE}/painel/login`);
+  await pg.waitForLoadState("networkidle");
   await pg.fill("input[name=telefone]", telefone);
   await pg.fill("input[name=senha]", "agendou123");
   await pg.click("button:has-text('Entrar')");
@@ -159,12 +160,10 @@ await p.waitForFunction((el) => el.textContent.trim().length > 0, await stCli.el
 const msgCad = await stCli.innerText();
 confere(/cadastrado/i.test(msgCad), "cliente de teste cadastrado", msgCad);
 
-// Navegar para ficha do cliente recém-criado
-const linkFicha = await p.locator("a[href*='/painel/clientes/']", { hasText: "Cliente Cobranca E2E" }).getAttribute("href").catch(async () => {
-  await p.fill("input[type=search]", "Cobranca E2E").catch(() => {});
-  await p.waitForTimeout(400);
-  return p.locator("a[href*='/painel/clientes/']").first().getAttribute("href").catch(() => null);
-});
+// Navegar para ficha do cliente recém-criado (busca garante que aparece mesmo além da pág. 1)
+await p.goto(`${URL_BASE}/painel/clientes?q=Cobranca+E2E`);
+await p.waitForLoadState("networkidle");
+const linkFicha = await p.locator("a[href*='/painel/clientes/']", { hasText: "Cliente Cobranca E2E" }).getAttribute("href", { timeout: 8000 }).catch(() => null);
 confere(!!linkFicha, "ficha do cliente encontrada na lista");
 
 // ---------------------------------------------------------------- 5. opt-out via "PARAR" — webhook de mensagem recebida
@@ -185,7 +184,9 @@ if (linkFicha) {
 
   // ---------------------------------------------------------------- 6. reativar opt-out via UI
   const msgReativar = await enviarForm(p, "Reativar cobrança");
-  confere(/reativada/i.test(msgReativar), "opt-out reativado pelo painel", msgReativar);
+  // A ação de reativar faz revalidatePath → Next.js re-renderiza a página e remove o formulário do DOM
+  const reativadoOk = /reativada/i.test(msgReativar) || msgReativar === "(formulário saiu da tela após salvar)";
+  confere(reativadoOk, "opt-out reativado pelo painel", msgReativar);
   await p.reload();
   confere(!(await p.locator("[role=alert]", { hasText: /PARAR/ }).isVisible()), "banner de opt-out sumiu após reativação");
 }

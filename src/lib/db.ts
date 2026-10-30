@@ -26,6 +26,8 @@ async function criarPglite(): Promise<Driver> {
   const dir = process.env.PGLITE_DIR ?? (process.env.VERCEL ? "/tmp/pglite" : path.join(process.cwd(), ".data", "pglite"));
   fs.mkdirSync(dir, { recursive: true });
   const pg = await PGlite.create(dir);
+  // Garante flush do WAL antes de sair (SIGTERM do pkill/Ctrl+C não chama process.exit automaticamente)
+  process.once("SIGTERM", () => pg.close().finally(() => process.exit(0)));
   return {
     async query<T>(sql: string, params: unknown[] = []) {
       const r = await pg.query<T>(sql, params as unknown[]);

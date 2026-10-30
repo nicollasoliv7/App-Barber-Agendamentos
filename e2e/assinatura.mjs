@@ -33,6 +33,7 @@ const texto = async () => (await p.locator("main").innerText()).replace(/\s+/g, 
 // ------------------------------------------------------------ cadastro self-service
 const TEL = `319${String(Date.now()).slice(-8)}`;
 await p.goto(`${URL}/cadastro?plano=anual`);
+await p.waitForLoadState("networkidle");
 await p.fill("input[name=barbearia]", "Barbearia Teste Assinatura");
 await p.fill("input[name=nome]", "Dono Teste");
 await p.fill("input[name=telefone]", TEL);
@@ -48,6 +49,7 @@ confere(t.includes("Assinar: pagar R$ 599,90"), "botão do Anual com o valor cob
 // cadastro repetido com o mesmo celular
 const p2 = await (await b.newContext()).newPage();
 await p2.goto(`${URL}/cadastro`);
+await p2.waitForLoadState("networkidle");
 await p2.fill("input[name=barbearia]", "Outra Tentativa");
 await p2.fill("input[name=nome]", "Fulano");
 await p2.fill("input[name=telefone]", TEL);
@@ -154,6 +156,7 @@ confere(!!posEstorno && Number(posEstorno.split("/")[2]) === new Date().getFullY
 // ------------------------------------------------------------ isolamento e barbearia de demonstração
 const demo = await (await b.newContext()).newPage();
 await demo.goto(`${URL}/painel/login`);
+await demo.waitForLoadState("networkidle");
 await demo.fill("input[name=telefone]", "11900000001");
 await demo.fill("input[name=senha]", "agendou123");
 await demo.click("button:has-text('Entrar')");

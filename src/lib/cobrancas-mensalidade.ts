@@ -132,28 +132,30 @@ async function processarEmpresa(
 ): Promise<number> {
   const hoje = hojeLocal(fuso);
 
-  return tx(async (t) => {
-    await sincronizarAssinaturas(t, empresaId);
-    const lista = await cobrancasPendentesParaRegua(empresaId);
-    let enviados = 0;
+  // sincronizarAssinaturas precisa de tx próprio; as leituras e envios seguintes
+  // não podem ficar dentro do mesmo tx — PGlite é single-connection e deadlockaria
+  // ao tentar q() enquanto o lock da transação já está adquirido.
+  await tx((t) => sincronizarAssinaturas(t, empresaId));
+  const lista = await cobrancasPendentesParaRegua(empresaId);
+  let enviados = 0;
 
-    for (const c of lista) {
-      if (c.cobranca_pausada) continue;
-      if (await clienteTemOptout(empresaId, c.cliente_id)) continue;
+  for (const c of lista) {
+    if (c.cobranca_pausada) continue;
+    if (await clienteTemOptout(empresaId, c.cliente_id)) continue;
 
-      const etapa = etapaDevida(hoje, c.vencimento, diasAntes, diasDepois);
-      if (!etapa) continue;
-      if (await etapaJaRegistrada(c.cobranca_id, etapa)) continue;
+    const etapa = etapaDevida(hoje, c.vencimento, diasAntes, diasDepois);
+    if (!etapa) continue;
+    if (await etapaJaRegistrada(c.cobranca_id, etapa)) continue;
 
-      const ok = await enviarUmaCobranca(
-        empresaId, c.cobranca_id, c.cliente_id,
-        c.cliente_nome, c.cliente_telefone, c.plano_nome,
-        c.valor_centavos, c.vencimento, etapa, hoje,
-      );
-      if (ok) enviados++;
-    }
-    return enviados;
-  });
+    const ok = await enviarUmaCobranca(
+      empresaId, c.cobranca_id, c.cliente_id,
+      c.cliente_nome, c.cliente_telefone, c.plano_nome,
+      c.valor_centavos, c.vencimento, etapa, hoje,
+    );
+    if (ok) enviados++;
+  }
+
+  return enviados;
 }
 
 // ---------------------------------------------------------------------------
