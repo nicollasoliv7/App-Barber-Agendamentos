@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { aplicarStatus, conferirAssinatura, registrarWebhookRecebido, segredosDoWebhook } from "@/lib/whatsapp";
+import { processarOptoutPorTelefone } from "@/lib/repositorios/cobrancas-mensalidade";
 
 /**
  * Webhook da WhatsApp Cloud API (Meta).
@@ -32,6 +33,7 @@ interface Evento {
       value?: {
         metadata?: { phone_number_id?: string };
         statuses?: { id?: string; status?: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] }[];
+        messages?: { from?: string; type?: string; text?: { body?: string } }[];
       };
     }[];
   }[];
@@ -62,6 +64,12 @@ export async function POST(req: Request) {
       const err = s.errors?.[0];
       const motivo = err ? `${err.error_data?.details ?? err.message ?? err.title ?? "Falha na entrega"}${err.code ? ` (código ${err.code})` : ""}` : null;
       await aplicarStatus(numero, s.id, s.status, motivo);
+    }
+    // R87: cliente que responder "PARAR" sai da régua de cobrança
+    for (const msg of v.messages ?? []) {
+      if (msg.type === "text" && /^\s*PARAR\s*$/i.test(msg.text?.body ?? "") && msg.from) {
+        await processarOptoutPorTelefone(numero, msg.from).catch(() => undefined);
+      }
     }
   }
   // a Meta reenvia o evento se não receber 200

@@ -15,7 +15,7 @@ import { log } from "./log";
  *    - enviado / entregue / lido / falhou → confirmados pelo webhook assinado da Meta
  */
 
-export type TipoNotificacao = "confirmacao" | "lembrete" | "codigo" | "cancelamento" | "remarcacao" | "aviso_empresa" | "teste";
+export type TipoNotificacao = "confirmacao" | "lembrete" | "codigo" | "cancelamento" | "remarcacao" | "aviso_empresa" | "teste" | "cobranca_mensalidade";
 
 export async function notificar(
   t: Executor,
@@ -48,6 +48,8 @@ function modeloPara(c: ConexaoWhatsapp, tipo: string | null): { nome: string; id
       return c.modelo_lembrete ? { nome: c.modelo_lembrete, idioma: c.idioma, params: c.modelo_lembrete_params ?? 0, botao: false } : null;
     case "codigo":
       return c.modelo_codigo ? { nome: c.modelo_codigo, idioma: c.idioma, params: 1, botao: c.modelo_codigo_botao } : null;
+    case "cobranca_mensalidade":
+      return c.modelo_cobranca ? { nome: c.modelo_cobranca, idioma: c.idioma, params: c.modelo_cobranca_params ?? 0, botao: false } : null;
     case "teste":
       // teste: usa o modelo de confirmação; sem ele, o "hello_world" que a Meta cria em toda conta nova
       return c.modelo_confirmacao

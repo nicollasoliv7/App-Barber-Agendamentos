@@ -124,14 +124,20 @@ export async function salvarModelosWhatsapp(_: Estado, f: FormData): Promise<Est
     const conf = await conferir("modelo_confirmacao", "Confirmação");
     const lem = await conferir("modelo_lembrete", "Lembrete");
     const cod = await conferir("modelo_codigo", "Código de verificação");
+    const cob = await conferir("modelo_cobranca", "Cobrança de mensalidade");
     for (const [m, r] of [
       [conf, "Confirmação"],
       [lem, "Lembrete"],
     ] as const)
       if (m && m.params > 6) throw new ErroNegocio(`${r}: o modelo tem ${m.params} variáveis; o máximo suportado é 6`);
     if (cod && cod.params !== 1) throw new ErroNegocio("Código de verificação: o modelo precisa ter exatamente 1 variável (o código)");
+    if (cob && cob.params !== 5) throw new ErroNegocio("Cobrança de mensalidade: o modelo precisa ter exatamente 5 variáveis ({{1}} nome … {{5}} Pix)");
     const lembretes = f.get("lembretes_ativos") === "on";
     if (lembretes && !lem) throw new ErroNegocio("Para ligar os lembretes automáticos, informe um modelo de lembrete aprovado");
+    const cobrancas = f.get("cobrancas_ativas") === "on";
+    if (cobrancas && !cob) throw new ErroNegocio("Para ligar as cobranças automáticas, informe um modelo de cobrança aprovado");
+    const diasAntes = Math.min(30, Math.max(1, Number(txt(f, "cobranca_dias_antes")) || 3));
+    const diasDepois = Math.min(30, Math.max(1, Number(txt(f, "cobranca_dias_depois")) || 3));
 
     await gravarModelos(u.empresa_id, {
       idioma,
@@ -142,8 +148,13 @@ export async function salvarModelosWhatsapp(_: Estado, f: FormData): Promise<Est
       codigo: cod?.nome ?? null,
       codigoBotao: cod?.botaoCodigo ?? false,
       lembretesAtivos: lembretes,
+      cobranca: cob?.nome ?? null,
+      cobrancaParams: cob?.params ?? null,
+      cobrancasAtivas: cobrancas,
+      cobrancaDiasAntes: diasAntes,
+      cobrancaDiasDepois: diasDepois,
     });
-    const ok = [conf && "confirmação", lem && "lembrete", cod && "código"].filter(Boolean);
+    const ok = [conf && "confirmação", lem && "lembrete", cod && "código", cob && "cobrança"].filter(Boolean);
     return ok.length ? `Modelos aprovados e salvos: ${ok.join(", ")}` : "Modelos removidos: nenhuma mensagem automática será enviada";
   });
 }
