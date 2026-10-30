@@ -92,7 +92,7 @@ export async function salvarConfigPix(empresaId: string, d: DadosPix) {
 }
 
 export async function configPix(empresaId: string): Promise<DadosPix | null> {
-  return q1<DadosPix>(`select tipo, chave, recebedor, cidade from config_pix where empresa_id = $1`, [empresaId]);
+  return (await q1<DadosPix>(`select tipo, chave, recebedor, cidade from config_pix where empresa_id = $1`, [empresaId])) ?? null;
 }
 
 // -------------------------------------------------------------------------
