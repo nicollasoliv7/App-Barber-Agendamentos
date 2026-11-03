@@ -127,6 +127,14 @@ Módulo opcional que complementa a seção 11. Requer número WhatsApp conectado
 - **R86 · Confirmação de pagamento** — Segue R66: o barbeiro registra o pagamento manualmente ("Recebi"). A régua para automaticamente quando a mensalidade fica `paga`.
 - **R87 · Opt-out** — Quando o cliente responde **PARAR** (ou variação de maiúsculas/minúsculas) ao número da barbearia, o sistema registra o opt-out em `assinatura_optout_cobranca(empresa_id, cliente_id)`. A régua para para aquele cliente naquela barbearia; a assinatura não é cancelada. O barbeiro vê o opt-out na ficha do cliente e pode reativar manualmente. O opt-out persiste mesmo que o cliente cancele e reassine um plano.
 
+## 14. Notificações Push — Web Push / VAPID (v8)
+
+- **R88 · Push para o barbeiro** — Ao confirmar um novo agendamento, ao cancelar ou ao remarcar (por iniciativa do cliente), o sistema envia uma notificação push para todos os aparelhos inscritos daquela empresa. Segue a mesma regra R56: o despacho acontece depois que a transação é gravada; uma falha no push nunca desfaz nem bloqueia o agendamento.
+- **R89 · Inscrição por aparelho** — A tabela `push_inscricao` guarda um endpoint único por aparelho, vinculado ao `usuario_painel` que ativou e à sua `empresa_id`. O barbeiro pode remover inscrições antigas pelo painel (Notificações). Endpoint que retorna 404/410 é removido automaticamente pelo servidor no próximo envio.
+- **R90 · VAPID** — Chaves geradas uma vez com `npx web-push generate-vapid-keys` e armazenadas nas variáveis de ambiente `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT`. Nunca vão para o código ou para o cliente (a chave pública é servida por `/api/push/chave-publica` somente quando um usuário do painel está autenticado). Substituir as chaves invalida todas as inscrições existentes.
+- **R91 · iOS PWA** — iPhone e iPad exigem que o app seja adicionado à Tela de Início (modo standalone, iOS 16.4+). O painel detecta automaticamente o Safari fora do modo standalone e exibe um passo a passo de instalação antes de mostrar o botão de ativação.
+- **R92 · Status honesto** — `nao_enviado` (sem inscrições ou sem VAPID configurado), `aceito` (pelo menos um aparelho recebeu), `falhou` (todos os aparelhos retornaram erro que não é 404/410). O ciclo de status segue o mesmo modelo do WhatsApp (R54).
+
 ## 13. Assinatura da plataforma — AbacatePay (v6)
 Não confundir com a seção 11: aqui é o que a **barbearia paga para usar o Agendou**.
 

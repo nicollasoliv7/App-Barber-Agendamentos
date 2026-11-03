@@ -3,6 +3,7 @@ import { tx, type Executor } from "./db";
 import { configAgendamento } from "./empresa";
 import { expirarPendentes, horariosLivres, profissionaisElegiveis } from "./disponibilidade";
 import { notificar } from "./notificacoes";
+import { notificarPushEmpresa } from "./push";
 import { formatarDataHora, instanteLocal, paraMinutos, reais } from "./tempo";
 import { ErroNegocio, type Agendamento, type CampoPersonalizado } from "./tipos";
 import { cnpjValido, cpfValido, dataValida, formatarTelefone, normalizarTelefone } from "./validacao";
@@ -197,6 +198,13 @@ export async function notificarConfirmacao(
       mensagem: `Novo agendamento: ${info.cliente} (${formatarTelefone(info.telefone)}) — ${info.servico} com ${info.profissional}, ${quando}.`,
     });
   }
+  // R88: push para o barbeiro após o commit (nunca bloqueia o agendamento)
+  await notificarPushEmpresa(t, {
+    empresaId: ag.empresa_id,
+    agendamentoId: ag.id,
+    titulo: "Novo agendamento",
+    corpo: `${info.cliente} agendou ${info.servico} em ${quando}`,
+  });
 }
 
 /** Link para o cliente gerenciar o agendamento sem login (precisa de APP_URL para virar link absoluto). */

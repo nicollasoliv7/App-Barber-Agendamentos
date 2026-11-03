@@ -3,6 +3,7 @@ import { tx, type Executor } from "./db";
 import { configAgendamento } from "./empresa";
 import { expirarPendentes, horariosLivres } from "./disponibilidade";
 import { notificar } from "./notificacoes";
+import { notificarPushEmpresa } from "./push";
 import { formatarDataHora, instanteLocal, paraMinutos } from "./tempo";
 import { ErroNegocio, type Agendamento } from "./tipos";
 import { removerCobertura, reavaliarCobertura } from "./planos-cobertura";
@@ -15,8 +16,8 @@ export type AcessoCliente = string | { clienteId?: string | null; token?: string
 async function carregarDoCliente(t: Executor, id: string, acesso: AcessoCliente) {
   const a = typeof acesso === "string" ? { clienteId: acesso, token: null } : acesso;
   if (!a.clienteId && !(a.token && a.token.length >= 20)) throw new ErroNegocio("Acesso negado", 403);
-  const [ag] = await t.query<Agendamento & { cliente_telefone: string; servico_nome: string; empresa_nome: string }>(
-    `select a.*, c.telefone as cliente_telefone, s.nome as servico_nome, e.nome as empresa_nome
+  const [ag] = await t.query<Agendamento & { cliente_telefone: string; cliente_nome: string; servico_nome: string; empresa_nome: string }>(
+    `select a.*, c.telefone as cliente_telefone, c.nome as cliente_nome, s.nome as servico_nome, e.nome as empresa_nome
      from agendamento a join cliente c on c.id = a.cliente_id join servico s on s.id = a.servico_id
      join empresa e on e.id = a.empresa_id
      where a.id = $1 and (a.cliente_id = $2::uuid or a.token_publico = $3::text) for update of a`,
@@ -45,6 +46,13 @@ export async function cancelarPeloCliente(id: string, clienteId: AcessoCliente) 
       tipo: "cancelamento",
       mensagem: `Seu agendamento de ${ag.servico_nome} em ${formatarDataHora(ag.inicio)} foi cancelado.`,
     });
+    // R88: push para o barbeiro após o commit
+    await notificarPushEmpresa(t, {
+      empresaId: ag.empresa_id,
+      agendamentoId: id,
+      titulo: "Agendamento cancelado",
+      corpo: `${ag.cliente_nome} cancelou ${ag.servico_nome} de ${formatarDataHora(ag.inicio)}`,
+    });
   });
 }
 
@@ -72,6 +80,13 @@ export async function remarcarPeloCliente(id: string, clienteId: AcessoCliente, 
       destino: ag.cliente_telefone,
       tipo: "remarcacao",
       mensagem: `Seu ${ag.servico_nome} foi remarcado de ${antigo} para ${formatarDataHora(inicio)}.`,
+    });
+    // R88: push para o barbeiro após o commit
+    await notificarPushEmpresa(t, {
+      empresaId: ag.empresa_id,
+      agendamentoId: id,
+      titulo: "Agendamento remarcado",
+      corpo: `${ag.cliente_nome} remarcou ${ag.servico_nome} para ${formatarDataHora(inicio)}`,
     });
   });
 }

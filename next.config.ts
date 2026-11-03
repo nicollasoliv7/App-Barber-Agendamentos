@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@electric-sql/pglite", "pg"],
+  serverExternalPackages: ["@electric-sql/pglite", "pg", "web-push"],
   // arquivos lidos em tempo de execução (schema do banco e binários do PGlite)
   outputFileTracingIncludes: {
     "/**": ["./db/schema.sql", "./node_modules/@electric-sql/pglite/dist/**/*.{wasm,data}"],

@@ -31,13 +31,13 @@ export const importacoesRecentes = (empresaId: string) =>
     [empresaId],
   );
 
-/** Resultado dos envios de WhatsApp nos últimos 30 dias (status reais). */
+/** Resultado dos envios de WhatsApp nos últimos 30 dias (status reais; exclui canal push). */
 export const estatisticasDeEnvio = (empresaId: string) =>
   q<{ aceitas: number; entregues: number; falhas: number; nao_enviadas: number }>(
     `select count(*) filter (where status in ('aceito','enviado','entregue','lido'))::int as aceitas,
               count(*) filter (where status in ('entregue','lido'))::int as entregues,
               count(*) filter (where status = 'falhou')::int as falhas,
               count(*) filter (where status = 'nao_enviado')::int as nao_enviadas
-       from notificacao where empresa_id = $1 and criado_em > now() - interval '30 days'`,
+       from notificacao where empresa_id = $1 and canal = 'whatsapp' and criado_em > now() - interval '30 days'`,
     [empresaId],
   );

@@ -211,7 +211,7 @@ create table if not exists notificacao (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid not null references empresa(id) on delete cascade,
   agendamento_id uuid references agendamento(id) on delete set null,
-  canal text not null check (canal in ('whatsapp','sms','email')),
+  canal text not null check (canal in ('whatsapp','sms','email','push')),
   destino text not null,
   mensagem text not null,
   status text not null default 'pendente' check (status in ('pendente','enviado','falhou')),
@@ -465,3 +465,35 @@ create table if not exists webhook_evento (
   resultado text,
   primary key (provedor, evento_id)
 );
+
+-- v8: Notificações Push (Web Push / VAPID) — R88–R91
+create table if not exists push_inscricao (
+  id          uuid primary key default gen_random_uuid(),
+  empresa_id  uuid not null references empresa(id) on delete cascade,
+  usuario_id  uuid not null references usuario_painel(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  aparelho    text,
+  criado_em   timestamptz not null default now()
+);
+create index if not exists push_inscricao_empresa_idx on push_inscricao (empresa_id);
+
+-- atualiza CHECK de canal para incluir 'push' (idempotente via DROP IF EXISTS)
+alter table notificacao drop constraint if exists notificacao_canal_check;
+alter table notificacao add constraint notificacao_canal_check
+  check (canal in ('whatsapp','sms','email','push'));
+
+-- atualiza CHECK de tipo para incluir todos os valores conhecidos (idempotente)
+do $$ begin
+  perform 1 from pg_constraint
+  where conrelid = 'notificacao'::regclass and conname = 'notificacao_tipo_check';
+  if not found then
+    alter table notificacao add constraint notificacao_tipo_check
+      check (tipo in (
+        'confirmacao','lembrete','codigo',
+        'cancelamento','remarcacao','aviso_empresa','teste',
+        'cobranca_mensalidade'
+      ));
+  end if;
+end $$;
