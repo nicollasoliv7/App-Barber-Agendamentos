@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { Icone } from "@/components/ui";
 
 const itens = [
@@ -23,8 +24,15 @@ const itens = [
 
 export default function Menu() {
   const atual = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const ativo = navRef.current?.querySelector('[aria-current="page"]') as HTMLElement | null;
+    ativo?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [atual]);
+
   return (
-    <nav aria-label="Menu do painel" className="sem-barra -mx-1 flex md:flex-col gap-0.5 overflow-x-auto px-1 text-sm">
+    <nav ref={navRef} aria-label="Menu do painel" className="sem-barra -mx-1 flex md:flex-col gap-0.5 overflow-x-auto px-1 text-sm">
       {itens.map(([href, rotulo, icone]) => {
         const ativo = href === "/painel" ? atual === href : atual.startsWith(href);
         return (

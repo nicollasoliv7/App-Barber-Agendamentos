@@ -65,7 +65,7 @@ export default async function Agendamentos({ searchParams }: PageProps<"/painel/
       {linhas.length === 0 ? (
         <Vazio titulo="Nenhum agendamento encontrado" texto="Ajuste o período ou limpe os filtros." />
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="card overflow-x-auto [contain:layout]">
           <table className="tabela min-w-[860px]">
             <thead>
               <tr>

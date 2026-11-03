@@ -10,7 +10,13 @@ export const metadata: Metadata = {
   description: "Tudo o que sua barbearia precisa para funcionar melhor: agenda, clientes, pagamentos e planos mensais em um só lugar.",
 };
 
-export const viewport: Viewport = { themeColor: "#07080a", colorScheme: "dark" };
+export const viewport: Viewport = {
+  themeColor: "#07080a",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

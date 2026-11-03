@@ -27,7 +27,7 @@ export default async function PainelLayout({ children }: { children: React.React
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 btn btn-key">
         Pular para o conteúdo
       </a>
-      <aside className="glass md:w-64 md:h-screen md:sticky md:top-0 md:rounded-none md:border-y-0 md:border-l-0 p-3 md:p-4 flex flex-col gap-3 md:gap-5 z-20">
+      <aside className="glass md:w-64 md:h-screen md:sticky md:top-0 md:rounded-none md:border-y-0 md:border-l-0 p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+0.25rem))] md:p-4 flex flex-col gap-3 md:gap-5 z-20">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 px-1">
             <Logo className="text-[15px]" />
@@ -62,7 +62,7 @@ export default async function PainelLayout({ children }: { children: React.React
           </div>
         </div>
       </aside>
-      <main id="conteudo" className="relative flex-1 min-w-0 px-4 py-6 md:px-8 md:py-8">
+      <main id="conteudo" className="relative flex-1 min-w-0 px-4 py-6 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.75rem))] md:px-8 md:py-8 md:pb-8">
         <div className="mx-auto max-w-[1240px]">
           {aviso && (
             <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#ffb347]/30 bg-[#ffb347]/[0.07] px-4 py-3 text-sm text-[#ffcf8a]">
