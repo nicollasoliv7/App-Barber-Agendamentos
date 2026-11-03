@@ -3,7 +3,7 @@ import { Aurora, Logo } from "@/components/ui";
 
 /** Moldura das páginas institucionais (Termos de uso, Política de privacidade). */
 export const CONTATO = "contato@agendou.com.br";
-export const ATUALIZADO_EM = "24 de outubro de 2026";
+export const ATUALIZADO_EM = "3 de novembro de 2026";
 
 export function Documento({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
@@ -22,6 +22,9 @@ export function Documento({ titulo, children }: { titulo: string; children: Reac
           </Link>
           <Link href="/privacidade" className="underline-offset-4 hover:text-white hover:underline">
             Política de privacidade
+          </Link>
+          <Link href="/reembolso" className="underline-offset-4 hover:text-white hover:underline">
+            Cancelamento e reembolso
           </Link>
           <Link href="/cadastro" className="underline-offset-4 hover:text-white hover:underline">
             Criar conta

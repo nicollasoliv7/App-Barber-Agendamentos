@@ -58,7 +58,11 @@ export default function Page() {
             "Os preços podem mudar. Mudanças não afetam períodos já pagos e serão informadas com antecedência.",
             <>
               Você pode desistir da contratação em até <strong>7 dias</strong> a contar do pagamento, conforme o artigo 49 do Código de Defesa do
-              Consumidor, escrevendo para {CONTATO}.
+              Consumidor, escrevendo para {CONTATO}. Detalhes na{" "}
+              <Link href="/reembolso" className="text-white underline underline-offset-4">
+                Política de cancelamento e reembolso
+              </Link>
+              .
             </>,
           ]}
         />

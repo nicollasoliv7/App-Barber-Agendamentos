@@ -145,7 +145,11 @@ export default async function Page({ searchParams }: PageProps<"/painel/assinatu
       </section>
       <p className="mt-3 text-xs faint">
         Pagamento único pelo período escolhido, por Pix ou cartão, no checkout seguro da AbacatePay. Não há cobrança recorrente: perto do vencimento, renove por
-        aqui. O plano é liberado assim que a AbacatePay confirma o pagamento.
+        aqui. O plano é liberado assim que a AbacatePay confirma o pagamento.{" "}
+        <a href="/reembolso" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-white">
+          Política de cancelamento e reembolso
+        </a>
+        .
       </p>
 
       {gestor && cobrancas.length > 0 && (

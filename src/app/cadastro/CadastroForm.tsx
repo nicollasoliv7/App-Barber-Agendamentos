@@ -43,10 +43,14 @@ export default function CadastroForm({ plano }: { plano: string }) {
           Li e aceito os{" "}
           <a href="/termos" target="_blank" rel="noopener" className="text-white underline underline-offset-4">
             termos de uso
-          </a>{" "}
-          e a{" "}
+          </a>
+          , a{" "}
           <a href="/privacidade" target="_blank" rel="noopener" className="text-white underline underline-offset-4">
             política de privacidade
+          </a>{" "}
+          e a{" "}
+          <a href="/reembolso" target="_blank" rel="noopener" className="text-white underline underline-offset-4">
+            política de cancelamento e reembolso
           </a>
           .
         </span>
