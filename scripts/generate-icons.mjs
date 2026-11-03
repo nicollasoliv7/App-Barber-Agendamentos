@@ -15,10 +15,8 @@ const outDir = resolve(root, "public/icons");
 
 const svg = readFileSync(src);
 
-for (const size of [192, 512]) {
-  await sharp(svg)
-    .resize(size, size)
-    .png()
-    .toFile(resolve(outDir, `icon-${size}.png`));
-  console.log(`✓ icon-${size}.png`);
+for (const size of [180, 192, 512]) {
+  const name = size === 180 ? "apple-touch-icon.png" : `icon-${size}.png`;
+  await sharp(svg).resize(size, size).png().toFile(resolve(outDir, name));
+  console.log(`✓ ${name}`);
 }
